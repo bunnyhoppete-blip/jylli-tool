@@ -609,15 +609,10 @@ function createWindow() {
     if (discordReady) discordRPC.clearActivity().catch(() => {})
   })
 
-  // Clicking the close button hides to tray; quit only from tray menu
-  mainWindow.on('close', (e) => {
-    if (!app.isQuitting) {
-      e.preventDefault()
-      mainWindow.hide()
-      updateTrayMenu()
-      // Clear Discord presence so status disappears while in tray
-      if (discordReady) discordRPC.clearActivity().catch(() => {})
-    }
+  // X button quits the app fully
+  mainWindow.on('close', () => {
+    app.isQuitting = true
+    app.quit()
   })
 
   mainWindow.on('closed', () => { mainWindow = null })
