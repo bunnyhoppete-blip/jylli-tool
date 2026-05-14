@@ -4593,26 +4593,17 @@ try {
   autoUpdater = au
   autoUpdater.autoDownload = false
   autoUpdater.autoInstallOnAppQuit = true
-  autoUpdater.logger = require('electron-log')
-  autoUpdater.logger.transports.file.level = 'info'
 
-  autoUpdater.on('update-available', (info) => {
-    mainWindow?.webContents.send('update-available', info)
-  })
-  autoUpdater.on('update-not-available', () => {
-    mainWindow?.webContents.send('update-not-available')
-  })
-  autoUpdater.on('download-progress', (progress) => {
-    mainWindow?.webContents.send('update-progress', progress)
-  })
-  autoUpdater.on('update-downloaded', (info) => {
-    mainWindow?.webContents.send('update-downloaded', info)
-  })
-  autoUpdater.on('error', (err) => {
-    mainWindow?.webContents.send('update-error', err?.message)
-  })
+  const sendLog = (msg) => mainWindow?.webContents.send('log', { msg, level: 'info', ts: new Date().toLocaleTimeString() })
+
+  autoUpdater.on('checking-for-update',  ()     => sendLog('Updater: checking for updates…'))
+  autoUpdater.on('update-available',     (info) => { sendLog(`Updater: update v${info.version} available`); mainWindow?.webContents.send('update-available', info) })
+  autoUpdater.on('update-not-available', ()     => sendLog('Updater: already on latest version'))
+  autoUpdater.on('download-progress',    (p)    => mainWindow?.webContents.send('update-progress', p))
+  autoUpdater.on('update-downloaded',    (info) => mainWindow?.webContents.send('update-downloaded', info))
+  autoUpdater.on('error',                (err)  => sendLog(`Updater error: ${err?.message}`))
 } catch (e) {
-  // electron-updater not installed yet — silently skip
+  // electron-updater not available
 }
 
 ipcMain.handle('check-update', async () => {
