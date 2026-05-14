@@ -4553,11 +4553,21 @@ ipcMain.handle('run-preflight-scan', async () => {
     }
   `, 45000)
 
-  // Parse into { id -> bool }
+  // Parse registry scan into { id -> bool }
   const tweakStates = {}
   for (const line of tweakScanR.out.split(/\r?\n/)) {
     const m = line.match(/^([a-z0-9-]+)=([01])$/)
     if (m) tweakStates[m[1]] = m[2] === '1'
+  }
+
+  // Also mark any tweak the user applied via this tool as active
+  // (registry scan may miss some tweaks that were applied correctly)
+  const savedSettings = loadSettings()
+  for (const [key, val] of Object.entries(savedSettings)) {
+    if (key.startsWith('tweak_') && val === 'applied') {
+      const id = key.replace('tweak_', '')
+      tweakStates[id] = true
+    }
   }
 
   // Build legacy conflicts list for existing UI (tweaks that are already applied)
@@ -4624,6 +4634,19 @@ ipcMain.handle('install-update', () => {
 
 // What's New content
 const WHATS_NEW = [
+  { version: '1.2', date: 'May 2026', items: [
+    'Personalization page — choose from 5 full themes (Jylli Red, Midnight Blue, Forest, Violet, Slate Gray), each with matching accent color',
+    'In-app updater — update banner slides up automatically when a new version is available, with download progress and one-click install',
+    'PRE-APPLIED tags — after running Pre-Flight scan, tweak cards show a blue PRE-APPLIED badge for tweaks already active on your system',
+    'Pre-Flight reliability fix — tweaks applied via Jylli Tool now correctly show as pre-applied in scan results',
+    'Discord Rich Presence now shows active Pulse game: "⚡ Pulse Active — FiveM" etc.',
+    'Discord status clears when app is hidden to tray, restores when reopened',
+    'X button now fully closes the app; minimize sends to tray',
+    'All version labels now read dynamically from package.json — never show wrong version again',
+    'Debug Console — hidden error panel in bottom-left shows raw PowerShell errors when tweaks fail',
+    'FiveM sidebar icon updated to match the rest of the nav',
+    'Fixed: update prompt timing — listeners now registered before checkUpdate() fires',
+  ]},
   { version: '1.1', date: 'May 2026', items: [
     'System tray — app minimizes to tray instead of taskbar; close button hides to tray; single-click to restore',
     'Tray context menu — shows Pulse status at a glance and lets you toggle Pulse on/off without opening the app',
