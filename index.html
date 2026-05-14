@@ -1038,7 +1038,8 @@ select.styled-select:focus { border-color: var(--pink); }
 .tweak-card { background:var(--bg-card2); border:1px solid var(--border); border-radius:var(--radius); padding:16px; display:flex; flex-direction:column; gap:10px; position:relative; transition:border-color .15s,transform .15s,box-shadow .15s; overflow:hidden; }
 .tweak-card:hover { border-color:rgba(255,46,99,0.3); transform:translateY(-1px); box-shadow:0 6px 20px rgba(0,0,0,0.4); }
 .tweak-card.tc-applied    { border-color:#1a5c35; box-shadow:0 0 10px rgba(46,204,113,0.08); }
-.tweak-card.tc-preapplied { border-color:#1a3a5c; box-shadow:0 0 10px rgba(52,152,219,0.08); }
+.tweak-card.tc-preapplied { border-color:#1a3a5c; box-shadow:0 0 10px rgba(52,152,219,0.08); position:relative; }
+.tc-preapplied-tag { position:absolute; top:8px; right:8px; background:rgba(52,152,219,0.18); border:1px solid rgba(52,152,219,0.4); color:#5aabdb; font-size:8px; font-weight:800; padding:2px 7px; border-radius:4px; letter-spacing:0.5px; pointer-events:none; }
 .tc-top { display:flex; align-items:flex-start; gap:12px; }
 .tc-icon { width:38px; height:38px; background:var(--bg-card); border:1px solid var(--border); border-radius:9px; display:flex; align-items:center; justify-content:center; font-size:18px; flex-shrink:0; }
 .tc-meta { flex:1; min-width:0; }
@@ -5461,6 +5462,7 @@ function makeCard({ id, name, desc, icon = '<i class="fa fa-gear"></i>', danger 
   d.className = 'tweak-card' + (applied ? ' tc-applied' : '') + (preApplied ? ' tc-preapplied' : '')
   d.id = `tcw-${id}`
   d.innerHTML = `
+    ${preApplied ? `<div class="tc-preapplied-tag"><i class="fa fa-magnifying-glass"></i> PRE-APPLIED</div>` : ''}
     <div class="tc-top">
       <div class="tc-icon">${icon}</div>
       <div class="tc-meta">
