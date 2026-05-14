@@ -200,8 +200,11 @@ async function destroyDiscordRPC() {
   if (discordRetryTimer) { clearInterval(discordRetryTimer); discordRetryTimer = null }
   if (discordRPC) {
     try {
-      // Wait for clearActivity to complete before destroying — otherwise status lingers
-      if (discordReady) await discordRPC.clearActivity().catch(() => {})
+      if (discordReady) {
+        await discordRPC.clearActivity().catch(() => {})
+        // Give Discord's IPC socket time to process the clear before the socket closes
+        await new Promise(r => setTimeout(r, 500))
+      }
       discordRPC.destroy()
     } catch (_) {}
     discordRPC = null
@@ -4634,6 +4637,11 @@ ipcMain.handle('install-update', () => {
 
 // What's New content
 const WHATS_NEW = [
+  { version: '1.3', date: 'May 2026', items: [
+    'Theme fix — switching themes now correctly recolors every element: buttons, glow effects, canvas charts, hover highlights, and all accent colors',
+    'Discord status fix — status now reliably clears when the app closes (500ms flush window added before socket teardown)',
+    'Auto-Optimize is fully in sync with all individual tweaks — uses the TWEAKS registry directly for accurate, up-to-date behavior',
+  ]},
   { version: '1.2', date: 'May 2026', items: [
     'Personalization page — choose from 5 full themes (Jylli Red, Midnight Blue, Forest, Violet, Slate Gray), each with matching accent color',
     'In-app updater — update banner slides up automatically when a new version is available, with download progress and one-click install',
