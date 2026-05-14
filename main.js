@@ -526,7 +526,7 @@ function webhookError(type, err) {
           { name: '❌  Error',  value: `\`\`\`\n${msg.slice(0, 800)}\n\`\`\`` },
           ...(stack ? [{ name: '📋  Stack Trace', value: `\`\`\`\n${stack.slice(0, 800)}\n\`\`\`` }] : []),
         ],
-        footer: { text: 'Jylli Tool  ·  v1.0  ·  Error Report' },
+        footer: { text: `Jylli Tool  ·  v${APP_VERSION}  ·  Error Report` },
         timestamp: new Date().toISOString(),
       }]
     })
