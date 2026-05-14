@@ -1,0 +1,42 @@
+{
+  "name": "jylli-tool",
+  "version": "1.2.0",
+  "description": "Professional Windows Optimization Tool",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "build": "electron-builder --win --x64",
+    "pack": "electron-builder --dir"
+  },
+  "build": {
+    "appId": "com.jylli.tool",
+    "productName": "Jylli Tool",
+    "win": {
+      "target": "nsis",
+      "icon": "assets/icon.ico",
+      "requestedExecutionLevel": "requireAdministrator"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "artifactName": "${productName} Setup.exe",
+      "installerSidebar": "assets/installer-sidebar.bmp",
+      "uninstallerSidebar": "assets/installer-sidebar.bmp",
+      "installerHeader": "assets/installer-header.bmp"
+    },
+    "publish": {
+      "provider": "github",
+      "owner": "bunnyhoppete-blip",
+      "repo": "jylli-tool"
+    }
+  },
+  "devDependencies": {
+    "electron": "^33.0.0",
+    "electron-builder": "^25.1.8"
+  },
+  "dependencies": {
+    "@fortawesome/fontawesome-free": "^7.2.0",
+    "discord-rpc": "^4.0.1",
+    "electron-updater": "^6.3.9"
+  }
+}

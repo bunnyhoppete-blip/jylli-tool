@@ -1,0 +1,549 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<link rel="stylesheet" href="assets/fa/css/all.min.css">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline';">
+<title>Pulse</title>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+  --pink:       #FF2E63;
+  --pink-hover: #E8254F;
+  --bg:         #0d0d0d;
+  --bg-card:    #141414;
+  --bg-dark:    #0a0a0a;
+  --border:     #1e1e1e;
+  --white:      #f0f0f0;
+  --muted:      #333333;
+  --success:    #2ECC71;
+  --warning:    #F39C12;
+  --danger:     #E74C3C;
+  --info:       #3498DB;
+}
+html, body {
+  background: var(--bg);
+  color: var(--white);
+  font-family: 'Segoe UI', system-ui, sans-serif;
+  font-size: 13px;
+  height: 100%;
+  overflow: hidden;
+  user-select: none;
+  -webkit-app-region: no-drag;
+}
+
+/* ── Titlebar ── */
+#titlebar {
+  display: flex;
+  align-items: center;
+  height: 42px;
+  background: #0a0a0a;
+  border-bottom: 1px solid #1a1a1a;
+  padding: 0 14px;
+  -webkit-app-region: drag;
+  flex-shrink: 0;
+}
+#titlebar .title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--white);
+  letter-spacing: 0.02em;
+  flex: 1;
+}
+#titlebar .title i { color: var(--pink); font-size: 14px; }
+#titlebar .badge {
+  padding: 3px 10px;
+  border-radius: 12px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  background: rgba(255,255,255,0.05);
+  border: 1px solid #222;
+  color: #555;
+  margin-right: 10px;
+}
+#titlebar .badge.live {
+  background: rgba(255,46,99,0.15);
+  border-color: rgba(255,46,99,0.4);
+  color: var(--pink);
+}
+.tb-btn {
+  -webkit-app-region: no-drag;
+  width: 28px; height: 28px;
+  border-radius: 6px;
+  border: none;
+  background: transparent;
+  color: #555;
+  cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 11px;
+  margin-left: 4px;
+  transition: all 0.1s;
+}
+.tb-btn:hover { background: rgba(255,255,255,0.06); color: var(--white); }
+.tb-btn.close:hover { background: #c0392b; color: #fff; }
+
+/* ── Layout ── */
+#app {
+  display: flex;
+  flex-direction: column;
+  height: calc(100vh - 42px);
+  overflow-y: auto;
+  padding: 16px;
+  gap: 12px;
+}
+#app::-webkit-scrollbar { width: 4px; }
+#app::-webkit-scrollbar-track { background: transparent; }
+#app::-webkit-scrollbar-thumb { background: #2a2a2a; border-radius: 2px; }
+
+/* ── Cards ── */
+.card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 14px 16px;
+}
+.card-label {
+  font-size: 9px;
+  font-weight: 700;
+  color: #444;
+  letter-spacing: 1.2px;
+  margin-bottom: 10px;
+}
+
+/* ── Preset grid ── */
+.preset-grid {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 7px;
+}
+.preset-card {
+  background: #0f0f0f;
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  padding: 11px 6px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 5px;
+  cursor: pointer;
+  transition: all 0.12s;
+  text-align: center;
+}
+.preset-card:hover { border-color: rgba(255,46,99,0.35); background: rgba(255,46,99,0.04); }
+.preset-card:hover i, .preset-card:hover .pname { color: var(--pink) !important; }
+.preset-card.selected {
+  border-color: var(--pink);
+  background: rgba(255,46,99,0.08);
+  box-shadow: 0 0 12px rgba(255,46,99,0.12);
+}
+.preset-card.selected i, .preset-card.selected .pname { color: var(--pink) !important; }
+.preset-card i { font-size: 15px; color: #444; }
+.preset-card .pname { font-size: 9.5px; font-weight: 600; color: #888; }
+
+/* ── Options ── */
+.opt-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 0;
+  border-bottom: 1px solid #111;
+  cursor: pointer;
+}
+.opt-row:last-child { border-bottom: none; padding-bottom: 0; }
+.opt-row input[type=checkbox] { accent-color: var(--pink); width: 13px; height: 13px; cursor: pointer; flex-shrink: 0; }
+.opt-title { font-size: 11.5px; color: #ccc; font-weight: 500; }
+.opt-sub { font-size: 9.5px; color: #444; margin-top: 1px; }
+
+/* ── Live monitor ── */
+.metric-row { margin-bottom: 8px; }
+.metric-row:last-child { margin-bottom: 0; }
+.metric-head { display: flex; justify-content: space-between; margin-bottom: 3px; }
+.metric-label { font-size: 10px; color: #555; font-weight: 600; letter-spacing: 0.05em; }
+.metric-val { font-size: 10px; color: #888; font-weight: 600; }
+.metric-track {
+  height: 4px;
+  background: rgba(255,255,255,0.05);
+  border-radius: 2px;
+  overflow: hidden;
+}
+.metric-fill {
+  height: 100%;
+  border-radius: 2px;
+  transition: width 0.5s ease;
+  width: 0%;
+}
+
+/* ── Buttons ── */
+.btn {
+  border: none; border-radius: 8px;
+  font-family: inherit; font-size: 12px; font-weight: 700;
+  cursor: pointer; padding: 10px 18px;
+  display: inline-flex; align-items: center; gap: 7px;
+  transition: all 0.12s;
+}
+.btn-pink { background: var(--pink); color: #fff; }
+.btn-pink:hover:not(:disabled) { background: var(--pink-hover); }
+.btn-pink:disabled { background: #2a1018; color: #5a2030; cursor: not-allowed; }
+.btn-ghost {
+  background: transparent;
+  border: 1px solid #252525;
+  color: #888;
+}
+.btn-ghost:hover:not(:disabled) { border-color: #444; color: var(--white); }
+.btn-ghost:disabled { opacity: 0.35; cursor: not-allowed; }
+.btn-stop { background: rgba(231,76,60,0.12); border: 1px solid rgba(231,76,60,0.3); color: #e74c3c; }
+.btn-stop:hover:not(:disabled) { background: rgba(231,76,60,0.2); }
+.btn-stop:disabled { opacity: 0.35; cursor: not-allowed; }
+
+/* ── Detect result ── */
+#detect-result { font-size: 10px; color: #444; min-height: 14px; }
+
+/* ── Process table ── */
+.proc-table { width: 100%; border-collapse: collapse; font-size: 11px; }
+.proc-table th {
+  text-align: left; padding: 7px 10px;
+  color: #444; font-size: 9px; font-weight: 700; letter-spacing: 0.08em;
+  border-bottom: 1px solid #111;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.proc-table th:hover { color: #888; }
+.proc-table td { padding: 5px 10px; border-bottom: 1px solid rgba(255,255,255,0.025); color: #aaa; }
+.proc-table tr:hover td { background: rgba(255,255,255,0.02); }
+.bar-wrap { height: 2px; background: rgba(255,255,255,0.05); border-radius: 1px; overflow: hidden; margin-bottom: 1px; }
+.bar-fill { height: 100%; border-radius: 1px; }
+.kill-btn {
+  background: transparent; border: 1px solid #222;
+  color: #444; border-radius: 4px;
+  width: 22px; height: 22px;
+  cursor: pointer; font-size: 10px;
+  display: flex; align-items: center; justify-content: center;
+  transition: all 0.1s;
+}
+.kill-btn:hover { background: rgba(231,76,60,0.15); border-color: #c0392b; color: #e74c3c; }
+
+/* ── Toast ── */
+#toast {
+  position: fixed; bottom: 16px; right: 16px;
+  background: #1a1a1a; border: 1px solid #2a2a2a;
+  border-radius: 10px; padding: 10px 16px;
+  font-size: 12px; color: var(--white);
+  box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+  display: none; z-index: 999;
+  animation: slideIn 0.2s ease;
+}
+@keyframes slideIn { from { opacity:0; transform:translateY(8px); } to { opacity:1; transform:translateY(0); } }
+</style>
+</head>
+<body>
+
+<!-- Titlebar -->
+<div id="titlebar">
+  <div class="title">
+    <i class="fa fa-satellite-dish"></i>
+    Pulse
+  </div>
+  <div id="status-badge" class="badge">● IDLE</div>
+  <button class="tb-btn" onclick="api.minimize()" title="Minimize"><i class="fa fa-minus"></i></button>
+  <button class="tb-btn close" onclick="closePulseWindow()" title="Close"><i class="fa fa-xmark"></i></button>
+</div>
+
+<!-- Main content -->
+<div id="app">
+
+  <!-- Game Presets -->
+  <div class="card">
+    <div class="card-label">GAME PRESETS</div>
+    <div class="preset-grid" id="preset-grid"></div>
+  </div>
+
+  <!-- Options + Live Monitor side by side -->
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+
+    <!-- Options -->
+    <div class="card">
+      <div class="card-label">OPTIONS</div>
+      <label class="opt-row">
+        <input type="checkbox" id="opt-kill" checked>
+        <div><div class="opt-title">Kill background apps</div><div class="opt-sub">Discord, browsers, Spotify, OneDrive…</div></div>
+      </label>
+      <label class="opt-row">
+        <input type="checkbox" id="opt-affinity" checked>
+        <div><div class="opt-title">CPU affinity optimisation</div><div class="opt-sub">Pins game to performance cores</div></div>
+      </label>
+      <label class="opt-row">
+        <input type="checkbox" id="opt-mmcss" checked>
+        <div><div class="opt-title">MMCSS GPU priority boost</div><div class="opt-sub">Raises GPU scheduling priority to High</div></div>
+      </label>
+    </div>
+
+    <!-- Live Monitor -->
+    <div class="card">
+      <div class="card-label">LIVE MONITOR</div>
+      <div class="metric-row">
+        <div class="metric-head"><span class="metric-label">CPU</span><span class="metric-val" id="cpu-val">—</span></div>
+        <div class="metric-track"><div class="metric-fill" id="cpu-bar" style="background:var(--pink)"></div></div>
+      </div>
+      <div class="metric-row">
+        <div class="metric-head"><span class="metric-label">RAM</span><span class="metric-val" id="ram-val">—</span></div>
+        <div class="metric-track"><div class="metric-fill" id="ram-bar" style="background:var(--info)"></div></div>
+      </div>
+      <div class="metric-row">
+        <div class="metric-head"><span class="metric-label">GPU</span><span class="metric-val" id="gpu-val">—</span></div>
+        <div class="metric-track"><div class="metric-fill" id="gpu-bar" style="background:var(--success)"></div></div>
+      </div>
+      <div id="detect-result" style="margin-top:8px"></div>
+    </div>
+  </div>
+
+  <!-- Action buttons -->
+  <div style="display:flex;gap:8px">
+    <button class="btn btn-pink" id="start-btn" onclick="doPulseStart()" style="flex:1;justify-content:center;font-size:13px" disabled>
+      <i class="fa fa-satellite-dish"></i> Activate Pulse
+    </button>
+    <button class="btn btn-stop" id="stop-btn" onclick="doPulseStop()" disabled>
+      <i class="fa fa-stop"></i> Stop
+    </button>
+    <button class="btn btn-ghost" onclick="doPulseDetect()" title="Auto-detect running game" style="padding:10px 14px">
+      <i class="fa fa-magnifying-glass"></i>
+    </button>
+  </div>
+
+  <!-- Process table -->
+  <div class="card" style="padding:0;overflow:hidden;flex:1">
+    <div style="display:flex;align-items:center;gap:8px;padding:10px 14px;border-bottom:1px solid var(--border)">
+      <span style="font-size:9px;font-weight:700;color:#444;letter-spacing:1.2px;flex:1">RUNNING PROCESSES</span>
+      <input id="proc-filter" type="text" placeholder="Filter…" oninput="filterProcs(this.value)"
+        style="background:#0a0a0a;border:1px solid var(--border);border-radius:5px;padding:3px 9px;color:var(--white);font-size:10px;font-family:inherit;outline:none;width:120px">
+      <button class="btn btn-ghost" onclick="loadProcs(this)" style="padding:4px 10px;font-size:10px;gap:5px">
+        <i class="fa fa-arrows-rotate"></i> Refresh
+      </button>
+      <span id="proc-count" style="font-size:9px;color:#333"></span>
+    </div>
+    <div style="max-height:280px;overflow-y:auto">
+      <table class="proc-table" id="proc-table">
+        <thead><tr>
+          <th onclick="sortProcs('name')">Process</th>
+          <th onclick="sortProcs('cpu')" style="width:72px">CPU %</th>
+          <th onclick="sortProcs('ram')" style="width:84px">RAM (MB)</th>
+          <th style="width:46px">PID</th>
+          <th style="width:38px"></th>
+        </tr></thead>
+        <tbody id="proc-tbody">
+          <tr><td colspan="5" style="text-align:center;color:#333;padding:20px">Loading…</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+</div>
+
+<div id="toast"></div>
+
+<script>
+// ── State ──
+const PRESET_ICONS = {
+  fortnite:'fa-crosshairs', valorant:'fa-crosshairs', csgo:'fa-crosshairs',
+  fivem:'fa-car', warzone:'fa-crosshairs', apex:'fa-crosshairs',
+  minecraft:'fa-cube', arma:'fa-shield-halved', tarkov:'fa-person-rifle',
+  rocketleague:'fa-futbol'
+}
+
+let selectedPreset = null
+let pulseActive = false
+let procData = [], procSort = { key: 'ram', dir: -1 }
+let metricsInterval = null
+
+// ── Init ──
+async function init() {
+  const presets = await api.pulseGetPresets()
+  const grid = document.getElementById('preset-grid')
+  grid.innerHTML = presets.map(p => `
+    <div class="preset-card" id="pc-${p.id}" onclick="selectPreset('${p.id}')">
+      <i class="fa ${PRESET_ICONS[p.id] || 'fa-gamepad'}"></i>
+      <div class="pname">${p.name}</div>
+    </div>
+  `).join('')
+
+  loadProcs()
+  startMetrics()
+  doPulseDetect()
+}
+
+// ── Preset selection ──
+function selectPreset(id) {
+  document.querySelectorAll('.preset-card').forEach(c => c.classList.remove('selected'))
+  document.getElementById(`pc-${id}`)?.classList.add('selected')
+  selectedPreset = id
+  if (!pulseActive) document.getElementById('start-btn').disabled = false
+}
+
+// ── Pulse actions ──
+async function doPulseStart() {
+  if (!selectedPreset) return
+  const startBtn = document.getElementById('start-btn')
+  const stopBtn = document.getElementById('stop-btn')
+  startBtn.disabled = true
+  startBtn.innerHTML = '<i class="fa fa-spinner fa-spin"></i> Activating…'
+  const r = await api.pulseStart({
+    presetId: selectedPreset,
+    killBg: document.getElementById('opt-kill')?.checked,
+    cpuCores: document.getElementById('opt-affinity')?.checked ? 'performance' : 'all',
+    mmcss: document.getElementById('opt-mmcss')?.checked
+  })
+  if (r.ok) {
+    pulseActive = true
+    startBtn.innerHTML = '<i class="fa fa-check"></i> Pulse Active'
+    stopBtn.disabled = false
+    setBadge(true)
+    showToast('Pulse Active', 'ok')
+  } else {
+    startBtn.disabled = false
+    startBtn.innerHTML = '<i class="fa fa-satellite-dish"></i> Activate Pulse'
+    showToast('Failed to start Pulse', 'err')
+  }
+}
+
+async function doPulseStop() {
+  await api.pulseStop()
+  pulseActive = false
+  const startBtn = document.getElementById('start-btn')
+  const stopBtn = document.getElementById('stop-btn')
+  if (startBtn) { startBtn.disabled = false; startBtn.innerHTML = '<i class="fa fa-satellite-dish"></i> Activate Pulse' }
+  if (stopBtn) stopBtn.disabled = true
+  setBadge(false)
+  showToast('Pulse stopped', 'info')
+}
+
+async function doPulseDetect() {
+  const el = document.getElementById('detect-result')
+  if (el) el.textContent = 'Scanning…'
+  const r = await api.pulseDetectGame()
+  if (r.found) {
+    if (el) el.innerHTML = `<span style="color:var(--success)"><i class="fa fa-check"></i> Detected: ${r.name}</span>`
+    selectPreset(r.id)
+  } else {
+    if (el) el.textContent = ''
+  }
+}
+
+function setBadge(live) {
+  const b = document.getElementById('status-badge')
+  if (!b) return
+  if (live) {
+    b.textContent = '● LIVE'
+    b.classList.add('live')
+  } else {
+    b.textContent = '● IDLE'
+    b.classList.remove('live')
+  }
+}
+
+// ── Live metrics ──
+function startMetrics() {
+  if (metricsInterval) clearInterval(metricsInterval)
+  metricsInterval = setInterval(async () => {
+    const m = await api.getMetrics()
+    if (!m) return
+    const cpu = m.cpu ?? 0, ram = m.ramPct ?? 0, gpu = m.gpu ?? 0
+    set('cpu-val', `${cpu}%`); set('cpu-bar', null, cpu)
+    set('ram-val', `${ram}%`); set('ram-bar', null, ram)
+    set('gpu-val', `${gpu}%`); set('gpu-bar', null, gpu)
+  }, 2000)
+}
+
+function set(id, text, pct) {
+  const el = document.getElementById(id)
+  if (!el) return
+  if (text !== null && text !== undefined) el.textContent = text
+  if (pct !== null && pct !== undefined) el.style.width = `${pct}%`
+}
+
+// ── Process table ──
+async function loadProcs(btn) {
+  if (btn) { btn.innerHTML = '<i class="fa fa-spinner fa-spin"></i>'; btn.disabled = true }
+  const procs = await api.getProcesses()
+  procData = Array.isArray(procs) ? procs : []
+  if (btn) { btn.innerHTML = '<i class="fa fa-arrows-rotate"></i> Refresh'; btn.disabled = false }
+  renderProcs(procData)
+  const el = document.getElementById('proc-count')
+  if (el) el.textContent = `${procData.length}`
+}
+
+function sortProcs(key) {
+  if (procSort.key === key) procSort.dir *= -1
+  else { procSort.key = key; procSort.dir = -1 }
+  renderProcs(procData)
+}
+
+function filterProcs(val) {
+  const q = val.toLowerCase()
+  renderProcs(q ? procData.filter(p => p.Name?.toLowerCase().includes(q)) : procData)
+}
+
+function renderProcs(data) {
+  const tbody = document.getElementById('proc-tbody')
+  if (!tbody) return
+  const sorted = [...data].sort((a, b) => {
+    const va = procSort.key === 'name' ? (a.Name||'') : procSort.key === 'cpu' ? (a.CPU||0) : (a.RAM||0)
+    const vb = procSort.key === 'name' ? (b.Name||'') : procSort.key === 'cpu' ? (b.CPU||0) : (b.RAM||0)
+    return procSort.key === 'name' ? va.localeCompare(vb) * procSort.dir : (va - vb) * procSort.dir
+  })
+  const maxRam = Math.max(...sorted.map(p => p.RAM||0), 1)
+  const maxCpu = Math.max(...sorted.map(p => p.CPU||0), 1)
+  tbody.innerHTML = sorted.slice(0, 80).map(p => {
+    const rp = Math.round((p.RAM||0) / maxRam * 100)
+    const cp = Math.min(100, Math.round((p.CPU||0) / maxCpu * 100))
+    const rc = rp > 70 ? 'var(--danger)' : rp > 40 ? 'var(--warning)' : 'var(--info)'
+    return `<tr>
+      <td>${p.Name||'?'}</td>
+      <td>
+        <div class="bar-wrap"><div class="bar-fill" style="width:${cp}%;background:var(--pink)"></div></div>
+        <div style="font-size:9px;color:#333">${p.CPU||0}%</div>
+      </td>
+      <td>
+        <div class="bar-wrap"><div class="bar-fill" style="width:${rp}%;background:${rc}"></div></div>
+        <div style="font-size:9px;color:#333">${(p.RAM||0).toFixed(0)} MB</div>
+      </td>
+      <td style="font-size:10px;color:#444">${p.Id||'?'}</td>
+      <td><button class="kill-btn" onclick="doKill(${p.Id},'${p.Name}')"><i class="fa fa-xmark"></i></button></td>
+    </tr>`
+  }).join('')
+}
+
+async function doKill(pid, name) {
+  if (!confirm(`Kill ${name} (PID ${pid})?`)) return
+  const r = await api.killProcess(pid)
+  showToast(r.ok ? `Killed ${name}` : `Failed`, r.ok ? 'ok' : 'err')
+  loadProcs()
+}
+
+// ── Toast ──
+let _toastTimer = null
+function showToast(msg, type) {
+  const el = document.getElementById('toast')
+  const colors = { ok: '#2ecc71', err: '#e74c3c', info: '#3498db' }
+  el.style.borderColor = colors[type] || '#2a2a2a'
+  el.textContent = msg
+  el.style.display = 'block'
+  if (_toastTimer) clearTimeout(_toastTimer)
+  _toastTimer = setTimeout(() => { el.style.display = 'none' }, 2500)
+}
+
+// ── Window controls ──
+function closePulseWindow() {
+  if (pulseActive) {
+    if (!confirm('Pulse is still active. Stop it and close?')) return
+    api.pulseStop()
+  }
+  api.closePulseWindow()
+}
+
+init()
+</script>
+</body>
+</html>

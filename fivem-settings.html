@@ -1,0 +1,780 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<link rel="stylesheet" href="assets/fa/css/all.min.css">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline';">
+<title>FiveM Graphics Settings</title>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+  --pink:       #FF2E63;
+  --pink-hover: #E8254F;
+  --pink-dim:   #3a0f1a;
+  --pink-glow:  rgba(255,46,99,0.18);
+  --bg:         #0d0d0d;
+  --bg-card:    #141414;
+  --bg-dark:    #0a0a0a;
+  --border:     #1e1e1e;
+  --border2:    #222;
+  --white:      #f0f0f0;
+  --gray:       #6a6a6a;
+  --muted:      #333333;
+  --success:    #2ECC71;
+  --success-bg: #0a1f12;
+  --warning:    #F39C12;
+  --danger:     #E74C3C;
+  --info:       #3498DB;
+  --orange:     #E67E22;
+}
+html, body {
+  background: var(--bg);
+  color: var(--white);
+  font-family: 'Segoe UI', system-ui, sans-serif;
+  font-size: 13px;
+  height: 100%;
+  overflow: hidden;
+  user-select: none;
+  -webkit-app-region: no-drag;
+}
+
+/* ── Titlebar ── */
+#titlebar {
+  display: flex;
+  align-items: center;
+  height: 44px;
+  background: var(--bg-dark);
+  border-bottom: 1px solid var(--border);
+  padding: 0 14px;
+  -webkit-app-region: drag;
+  flex-shrink: 0;
+  gap: 10px;
+}
+.tb-icon {
+  width: 28px; height: 28px;
+  border-radius: 8px;
+  background: linear-gradient(135deg, var(--pink-dim), #1a0a12);
+  border: 1px solid rgba(255,46,99,0.3);
+  display: flex; align-items: center; justify-content: center;
+  color: var(--pink); font-size: 13px;
+  flex-shrink: 0;
+}
+.tb-title {
+  flex: 1;
+  font-size: 13px; font-weight: 700;
+  color: var(--white);
+  letter-spacing: 0.02em;
+}
+.tb-title span { color: var(--pink); }
+.tb-subtitle {
+  font-size: 10px; color: #444;
+  font-weight: 400; margin-top: 1px;
+}
+.tb-close {
+  -webkit-app-region: no-drag;
+  width: 28px; height: 28px;
+  border-radius: 6px;
+  border: none;
+  background: transparent;
+  color: #555;
+  cursor: pointer;
+  font-size: 14px;
+  display: flex; align-items: center; justify-content: center;
+  transition: background 0.12s, color 0.12s;
+}
+.tb-close:hover { background: var(--danger); color: white; }
+
+/* ── Layout ── */
+#root {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+}
+#content {
+  flex: 1;
+  overflow-y: auto;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+#content::-webkit-scrollbar { width: 4px; }
+#content::-webkit-scrollbar-track { background: transparent; }
+#content::-webkit-scrollbar-thumb { background: #222; border-radius: 2px; }
+
+/* ── Path row ── */
+#path-row {
+  display: flex; gap: 8px; align-items: center;
+}
+#path-row input {
+  flex: 1;
+  background: var(--bg-card);
+  border: 1px solid var(--border2);
+  border-radius: 7px;
+  padding: 6px 10px;
+  color: var(--white);
+  font-size: 11px;
+  outline: none;
+}
+#path-row input:focus { border-color: rgba(255,46,99,0.5); }
+#path-status {
+  font-size: 10px; color: #444;
+  padding: 2px 0 4px;
+}
+
+/* ── Buttons ── */
+.btn {
+  display: inline-flex; align-items: center; gap: 6px;
+  border: none; border-radius: 7px;
+  padding: 7px 14px;
+  font-size: 11px; font-weight: 600;
+  cursor: pointer; transition: all 0.12s;
+  white-space: nowrap;
+}
+.btn:disabled { opacity: 0.45; cursor: not-allowed; }
+.btn-primary {
+  background: var(--pink);
+  color: white;
+}
+.btn-primary:not(:disabled):hover { background: var(--pink-hover); }
+.btn-ghost {
+  background: rgba(255,255,255,0.05);
+  border: 1px solid var(--border2);
+  color: var(--white);
+}
+.btn-ghost:not(:disabled):hover { background: rgba(255,255,255,0.09); }
+.btn-success {
+  background: var(--success-bg);
+  border: 1px solid #1a5c35;
+  color: var(--success);
+}
+.btn-success:not(:disabled):hover { background: var(--success); color: #0a2a14; }
+
+/* ── Empty / error states ── */
+#empty-state {
+  flex: 1; display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  gap: 12px; color: #333; text-align: center;
+  padding: 40px;
+}
+#empty-state i { font-size: 36px; color: #222; }
+#empty-state p { font-size: 12px; max-width: 320px; line-height: 1.6; }
+#empty-state small { font-size: 10px; color: #2a2a2a; }
+
+/* ── Category group ── */
+.cat-group {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  overflow: hidden;
+}
+.cat-header {
+  display: flex; align-items: center; gap: 8px;
+  padding: 10px 14px;
+  background: rgba(255,255,255,0.02);
+  border-bottom: 1px solid var(--border);
+}
+.cat-icon {
+  width: 24px; height: 24px;
+  border-radius: 6px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 11px;
+  flex-shrink: 0;
+}
+.cat-name { font-size: 12px; font-weight: 700; color: var(--white); }
+.cat-desc { font-size: 10px; color: #444; margin-left: auto; }
+
+/* ── Setting row ── */
+.setting-row {
+  display: grid;
+  grid-template-columns: 1fr 140px 60px;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  border-bottom: 1px solid rgba(255,255,255,0.03);
+  transition: background 0.1s;
+}
+.setting-row:last-child { border-bottom: none; }
+.setting-row:hover { background: rgba(255,255,255,0.02); }
+.setting-row.is-changed { background: rgba(255,46,99,0.05); }
+.setting-label {
+  font-size: 11px; font-weight: 500;
+  color: var(--white);
+  display: flex; flex-direction: column; gap: 2px;
+}
+.setting-label small { font-size: 9px; color: #383838; font-weight: 400; }
+.setting-label .missing-tag {
+  font-size: 9px; color: #5a2a2a;
+  background: rgba(231,76,60,0.1);
+  border: 1px solid rgba(231,76,60,0.2);
+  border-radius: 3px; padding: 1px 5px;
+  display: inline-block; margin-top: 1px;
+}
+.setting-control select {
+  width: 100%;
+  background: #0f0f0f;
+  border: 1px solid #222;
+  border-radius: 6px;
+  padding: 5px 8px;
+  color: var(--white);
+  font-size: 11px;
+  cursor: pointer;
+  outline: none;
+  transition: border-color 0.12s;
+}
+.setting-control select:focus { border-color: rgba(255,46,99,0.5); }
+.setting-control select.is-rec { border-color: rgba(46,204,113,0.35); }
+.impact-pill {
+  display: inline-flex; align-items: center; justify-content: center;
+  border-radius: 20px;
+  padding: 2px 8px;
+  font-size: 9px; font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+.imp-low       { background: rgba(74,222,128,0.1);  color: #4ade80; border: 1px solid rgba(74,222,128,0.25); }
+.imp-medium    { background: rgba(250,204,21,0.1);  color: #facc15; border: 1px solid rgba(250,204,21,0.25); }
+.imp-high      { background: rgba(249,115,22,0.1);  color: #f97316; border: 1px solid rgba(249,115,22,0.25); }
+.imp-very-high { background: rgba(239,68,68,0.12);  color: #ef4444; border: 1px solid rgba(239,68,68,0.3); }
+
+/* ── Footer action bar ── */
+#footer {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 16px;
+  background: var(--bg-dark);
+  border-top: 1px solid var(--border);
+}
+#footer-info {
+  flex: 1;
+  font-size: 10px; color: #383838;
+  line-height: 1.5;
+}
+#footer-info span { color: #555; }
+#changes-count {
+  font-size: 10px;
+  color: var(--pink);
+  background: var(--pink-dim);
+  border: 1px solid rgba(255,46,99,0.3);
+  border-radius: 20px;
+  padding: 2px 9px;
+  font-weight: 600;
+  display: none;
+}
+
+/* ── Preset bar ── */
+#preset-bar {
+  display: none;
+  align-items: center;
+  gap: 8px;
+}
+.preset-label {
+  font-size: 10px; font-weight: 600;
+  color: #444;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  white-space: nowrap;
+  margin-right: 2px;
+}
+.preset-btn {
+  display: inline-flex; align-items: center; gap: 6px;
+  border-radius: 8px;
+  padding: 7px 14px;
+  font-size: 11px; font-weight: 600;
+  cursor: pointer; transition: all 0.12s;
+  border: 1px solid transparent;
+  white-space: nowrap;
+}
+.preset-btn:hover { transform: translateY(-1px); }
+.preset-btn:active { transform: translateY(0); }
+.preset-quality {
+  background: rgba(52,152,219,0.1);
+  border-color: rgba(52,152,219,0.3);
+  color: #3498DB;
+}
+.preset-quality:hover {
+  background: rgba(52,152,219,0.18);
+  border-color: rgba(52,152,219,0.55);
+}
+.preset-performance {
+  background: rgba(255,46,99,0.1);
+  border-color: rgba(255,46,99,0.3);
+  color: var(--pink);
+}
+.preset-performance:hover {
+  background: rgba(255,46,99,0.18);
+  border-color: rgba(255,46,99,0.55);
+}
+.preset-divider {
+  width: 1px; height: 20px;
+  background: #222;
+  margin: 0 2px;
+}
+
+</style>
+</head>
+<body>
+<div id="root">
+  <!-- Titlebar -->
+  <div id="titlebar">
+    <div class="tb-icon"><i class="fa fa-sliders"></i></div>
+    <div style="flex:1">
+      <div class="tb-title">FiveM <span>Graphics</span> Settings</div>
+      <div class="tb-subtitle">gta5_settings.xml editor</div>
+    </div>
+    <button class="tb-close" onclick="window.api.closeFivemSettings()"><i class="fa fa-xmark"></i></button>
+  </div>
+
+  <!-- Content -->
+  <div id="content">
+
+    <!-- Path row -->
+    <div>
+      <div id="path-row">
+        <input id="manual-path" type="text" placeholder="Optional: paste full path to gta5_settings.xml if auto-detect fails" spellcheck="false">
+        <button class="btn btn-ghost" id="btn-load" onclick="loadSettings()"><i class="fa fa-rotate"></i> Load</button>
+      </div>
+      <div id="path-status"></div>
+    </div>
+
+    <!-- Preset bar -->
+    <div id="preset-bar">
+      <span class="preset-label"><i class="fa fa-wand-magic-sparkles"></i> Presets</span>
+      <div class="preset-divider"></div>
+      <button class="preset-btn preset-quality" onclick="applyPreset('quality')">
+        <i class="fa fa-gem"></i> Quality
+      </button>
+      <button class="preset-btn preset-performance" onclick="applyPreset('performance')">
+        <i class="fa fa-bolt"></i> Performance
+      </button>
+      <div class="preset-divider"></div>
+      <button class="btn btn-ghost" style="font-size:10px;padding:5px 10px;" onclick="applyRecommended()">
+        <i class="fa fa-wand-sparkles"></i> Recommended
+      </button>
+    </div>
+
+    <!-- Settings body (populated by JS) -->
+    <div id="settings-body">
+      <div id="empty-state">
+        <i class="fa fa-sliders"></i>
+        <p>Load your FiveM graphics settings to get started.</p>
+        <small>File: %APPDATA%\CitizenFX\gta5_settings.xml<br>If the file doesn't exist, open FiveM → Settings → Graphics, change any option, then close FiveM.</small>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- FiveM running warning banner (shown before first save) -->
+  <div id="fivem-warn-banner" style="display:none;align-items:flex-start;gap:12px;padding:12px 16px;background:rgba(230,126,34,0.08);border-top:1px solid rgba(230,126,34,0.25);flex-shrink:0">
+    <i class="fa fa-triangle-exclamation" style="color:#e67e22;font-size:16px;margin-top:1px;flex-shrink:0"></i>
+    <div style="flex:1">
+      <div style="font-size:12px;font-weight:700;color:#e67e22;margin-bottom:3px">Make sure FiveM is fully closed before saving</div>
+      <div style="font-size:10px;color:#8a8a9a;line-height:1.5">FiveM writes back to <code style="color:#aaa">gta5_settings.xml</code> when you exit the graphics menu or quit the game — this will overwrite your saved settings. Close FiveM completely first, then save here, then relaunch FiveM without opening Graphics Settings.</div>
+    </div>
+    <div style="display:flex;gap:6px;flex-shrink:0;align-items:center">
+      <button class="btn btn-ghost" style="font-size:10px;padding:5px 10px" onclick="document.getElementById('fivem-warn-banner').style.display='none'">Cancel</button>
+      <button class="btn btn-primary" style="font-size:10px;padding:5px 12px;background:#e67e22;border-color:#e67e22" onclick="confirmSaveAnyway()"><i class="fa fa-floppy-disk"></i> Save Anyway</button>
+    </div>
+  </div>
+
+  <!-- Footer -->
+  <div id="footer">
+    <div id="footer-info">
+      <span id="path-display">No file loaded</span>
+    </div>
+    <span id="changes-count">0 changes</span>
+    <button class="btn btn-primary" id="btn-save" onclick="saveSettings()" disabled><i class="fa fa-floppy-disk"></i> Save Settings</button>
+  </div>
+</div>
+
+<script>
+// ─── Category definitions ─────────────────────────────────────────────────────
+const CATEGORIES = [
+  {
+    id: 'lod',
+    name: 'Level of Detail',
+    icon: '<i class="fa fa-layer-group"></i>',
+    color: '#f97316',
+    desc: 'Distance & object detail',
+    keys: ['LodScale', 'PedLodBias', 'VehicleLodBias', 'HdStreamingInFlight']
+  },
+  {
+    id: 'shadows',
+    name: 'Shadows',
+    icon: '<i class="fa fa-moon"></i>',
+    color: '#9B59B6',
+    desc: 'Shadow quality & cost',
+    keys: ['ShadowQuality', 'Shadow_Distance', 'Shadow_SoftShadows', 'UltraShadows_Enabled', 'Shadow_ParticleShadows', 'Shadow_LongShadows']
+  },
+  {
+    id: 'aa',
+    name: 'Anti-Aliasing',
+    icon: '<i class="fa fa-border-all"></i>',
+    color: '#3498DB',
+    desc: 'Edge smoothing options',
+    keys: ['MSAA', 'FXAA_Enabled', 'TXAA_Enabled', 'ReflectionMSAA']
+  },
+  {
+    id: 'env',
+    name: 'Environment',
+    icon: '<i class="fa fa-tree"></i>',
+    color: '#2ECC71',
+    desc: 'World detail & density',
+    keys: ['GrassQuality', 'WaterQuality', 'ParticleQuality', 'Lighting_FogVolumes', 'CityDensity', 'VehicleVarietyMultiplier', 'PedVarietyMultiplier']
+  },
+  {
+    id: 'rendering',
+    name: 'Rendering',
+    icon: '<i class="fa fa-microchip"></i>',
+    color: '#FF2E63',
+    desc: 'GPU shading & effects',
+    keys: ['ShaderQuality', 'ReflectionQuality', 'SSAO', 'Tessellation', 'AnisotropicFiltering', 'PostFX']
+  },
+  {
+    id: 'effects',
+    name: 'Visual Effects',
+    icon: '<i class="fa fa-wand-sparkles"></i>',
+    color: '#F39C12',
+    desc: 'DoF, blur & depth effects',
+    keys: ['DoF', 'MotionBlurStrength']
+  }
+]
+
+const IMPACT_CLASS = { low: 'imp-low', medium: 'imp-medium', high: 'imp-high', 'very high': 'imp-very-high' }
+
+// ─── Presets ──────────────────────────────────────────────────────────────────
+const PRESETS = {
+  // Clean visuals with solid performance — balanced for RP servers
+  quality: {
+    LodScale:                  '1.000000',  // default LOD distance, world looks normal
+    PedLodBias:                '0.200000',  // low bias — peds still pop-in slightly less
+    VehicleLodBias:            '0.200000',  // subtle improvement over Off
+    ShadowQuality:             '2',         // High shadows — big visual difference
+    ReflectionQuality:         '2',         // High reflections — cars/puddles look good
+    ReflectionMSAA:            '0',         // Off — reflection AA is expensive, skip
+    MSAA:                      '0',         // Off — use FXAA instead (cheaper)
+    FXAA_Enabled:              'true',      // On — soft edges without the MSAA cost
+    TXAA_Enabled:              'false',     // Off — blurry and expensive
+    ParticleQuality:           '2',         // High — smoke/fire effects look clean
+    WaterQuality:              '1',         // Normal — good enough, not Ultra
+    GrassQuality:              '1',         // Normal — some grass, not the fps killer
+    ShaderQuality:             '2',         // High — good lighting without Ultra cost
+    Shadow_Distance:           '0.750000',  // 0.75 — shadows visible at reasonable range
+    Shadow_SoftShadows:        '1',         // Softer — looks much better than Off
+    UltraShadows_Enabled:      'false',     // Off — not worth the GPU cost
+    Shadow_ParticleShadows:    'false',     // Off — nearly invisible, save the FPS
+    Shadow_LongShadows:        'false',     // Off — irrelevant in most RP scenarios
+    CityDensity:               '0.500000',  // Low — some peds but not a slideshow
+    VehicleVarietyMultiplier:  '0.500000',  // Low — traffic without heavy CPU cost
+    PedVarietyMultiplier:      '0.500000',  // Low variety, still feels alive
+    PostFX:                    '2',         // High — colour grading looks great
+    DoF:                       'false',     // Off — blurry background is distracting
+    MotionBlurStrength:        '0.000000',  // Off — cleaner aiming
+    Tessellation:              '1',         // Normal — subtle geometry detail
+    AnisotropicFiltering:      '16',        // 16x — textures sharp at all angles, free
+    SSAO:                      '1',         // Normal — ambient occlusion, nice depth
+    Lighting_FogVolumes:       'false',     // Off — volumetric fog is a GPU hog
+    HdStreamingInFlight:       'false',     // Off — only matters if flying constantly
+  },
+
+  // Pure FPS — visuals stripped to minimum, game still playable
+  performance: {
+    LodScale:                  '0.500000',  // 0.5 — less detail at distance
+    PedLodBias:                '0.000000',  // Off — low-poly peds from further away
+    VehicleLodBias:            '0.000000',  // Off — same for vehicles
+    ShadowQuality:             '1',         // Normal — shadows but not expensive
+    ReflectionQuality:         '0',         // Off — big GPU saver
+    ReflectionMSAA:            '0',         // Off
+    MSAA:                      '0',         // Off — biggest AA cost, skip entirely
+    FXAA_Enabled:              'false',     // Off — squeeze every frame
+    TXAA_Enabled:              'false',     // Off
+    ParticleQuality:           '1',         // Normal — minimal effect on FPS
+    WaterQuality:              '0',         // Low — barely noticeable
+    GrassQuality:              '0',         // Off — single biggest open-world FPS gain
+    ShaderQuality:             '2',         // High — shaders at High is still efficient
+    Shadow_Distance:           '0.500000',  // 0.5 — shadows only near you
+    Shadow_SoftShadows:        '0',         // Off — hard shadows, saves GPU
+    UltraShadows_Enabled:      'false',     // Off
+    Shadow_ParticleShadows:    'false',     // Off
+    Shadow_LongShadows:        'false',     // Off
+    CityDensity:               '0.000000',  // Off — no ambient peds, max FPS
+    VehicleVarietyMultiplier:  '0.000000',  // Off — no ambient traffic
+    PedVarietyMultiplier:      '0.000000',  // Off
+    PostFX:                    '1',         // Normal — basic colour, minimal cost
+    DoF:                       'false',     // Off
+    MotionBlurStrength:        '0.000000',  // Off
+    Tessellation:              '0',         // Off — no geometry subdivision
+    AnisotropicFiltering:      '16',        // 16x — essentially free, keep it
+    SSAO:                      '0',         // Off — skip ambient occlusion
+    Lighting_FogVolumes:       'false',     // Off
+    HdStreamingInFlight:       'false',     // Off
+  },
+}
+const IMPACT_LABEL = { low: 'Low', medium: 'Med', high: 'High', 'very high': 'Very High' }
+
+let currentDefs = []
+let currentVals = {}
+let currentPath = ''
+let pendingChanges = 0
+
+function getManualPath() {
+  return (document.getElementById('manual-path')?.value || '').trim() || undefined
+}
+
+async function loadSettings() {
+  const btn = document.getElementById('btn-load')
+  const body = document.getElementById('settings-body')
+  const pathStatus = document.getElementById('path-status')
+
+  btn.disabled = true
+  btn.innerHTML = '<i class="fa fa-spinner fa-spin"></i> Loading…'
+  body.innerHTML = `<div id="empty-state"><i class="fa fa-spinner fa-spin" style="font-size:28px;color:#333"></i><p style="color:#333">Reading settings file…</p></div>`
+
+  const r = await window.api.fivemReadSettings(getManualPath())
+  btn.disabled = false
+  btn.innerHTML = '<i class="fa fa-rotate"></i> Load'
+
+  if (!r.ok) {
+    pathStatus.innerHTML = `<i class="fa fa-triangle-exclamation" style="color:#E74C3C"></i> ${r.reason}`
+    body.innerHTML = `<div id="empty-state">
+      <i class="fa fa-triangle-exclamation" style="color:#E74C3C;font-size:32px"></i>
+      <p style="color:#555">${r.reason}</p>
+      ${r.hint ? `<small>${r.hint}</small>` : ''}
+    </div>`
+    return
+  }
+
+  currentDefs = r.defs
+  currentVals = r.vals
+  currentPath = r.path
+  pathStatus.innerHTML = `<i class="fa fa-check" style="color:#2ECC71"></i> ${r.path}`
+  document.getElementById('path-display').textContent = r.path
+  document.getElementById('btn-save').disabled = false
+  document.getElementById('preset-bar').style.display = 'flex'
+
+  renderSettings()
+  trackChanges()
+}
+
+function renderSettings() {
+  const body = document.getElementById('settings-body')
+  body.innerHTML = ''
+
+  // Build key→def lookup
+  const defMap = {}
+  for (const d of currentDefs) defMap[d.key] = d
+
+  for (const cat of CATEGORIES) {
+    const catDefs = cat.keys.map(k => defMap[k]).filter(Boolean)
+    if (!catDefs.length) continue
+
+    const group = document.createElement('div')
+    group.className = 'cat-group'
+
+    // Header
+    const header = document.createElement('div')
+    header.className = 'cat-header'
+    header.innerHTML = `
+      <div class="cat-icon" style="background:${cat.color}18;border:1px solid ${cat.color}33;color:${cat.color}">${cat.icon}</div>
+      <div class="cat-name">${cat.name}</div>
+      <div class="cat-desc">${cat.desc}</div>
+    `
+    group.appendChild(header)
+
+    // Rows
+    for (const def of catDefs) {
+      const curVal = currentVals[def.key]
+      const isRec = curVal !== null && String(curVal) === String(def.rec)
+      const isMissing = curVal === null
+      const displayVal = curVal !== null ? curVal : def.rec
+
+      const row = document.createElement('div')
+      row.className = 'setting-row'
+      row.id = `srow-${def.key}`
+
+      const impCls = IMPACT_CLASS[def.impact] || 'imp-low'
+      const impLbl = IMPACT_LABEL[def.impact] || def.impact
+
+      // Build select
+      let optionsHtml = ''
+      for (const [v, label] of def.opts) {
+        const sel = String(v) === String(displayVal) ? 'selected' : ''
+        optionsHtml += `<option value="${v}" ${sel}>${label}</option>`
+      }
+
+      row.innerHTML = `
+        <div class="setting-label">
+          ${def.label}
+          ${isMissing ? '<span class="missing-tag"><i class="fa fa-circle-exclamation"></i> not in file — will be added on save</span>' : ''}
+        </div>
+        <div class="setting-control">
+          <select id="sval-${def.key}" onchange="onSettingChange('${def.key}')" class="${isRec ? 'is-rec' : ''}">
+            ${optionsHtml}
+          </select>
+        </div>
+        <div><span class="impact-pill ${impCls}">${impLbl}</span></div>
+      `
+      group.appendChild(row)
+    }
+
+    body.appendChild(group)
+  }
+}
+
+function onSettingChange(key) {
+  const el = document.getElementById(`sval-${key}`)
+  const def = currentDefs.find(d => d.key === key)
+  if (!def || !el) return
+
+  const isRec = String(el.value) === String(def.rec)
+  el.classList.toggle('is-rec', isRec)
+
+  const origVal = currentVals[key]
+  const isChanged = origVal !== null && String(el.value) !== String(origVal)
+  document.getElementById(`srow-${key}`)?.classList.toggle('is-changed', isChanged)
+
+  trackChanges()
+}
+
+function trackChanges() {
+  if (!currentDefs.length) return
+  let count = 0
+  for (const def of currentDefs) {
+    const el = document.getElementById(`sval-${def.key}`)
+    if (!el) continue
+    const orig = currentVals[def.key]
+    if (orig !== null && String(el.value) !== String(orig)) count++
+  }
+  pendingChanges = count
+  const badge = document.getElementById('changes-count')
+  if (count > 0) {
+    badge.style.display = 'inline-block'
+    badge.textContent = `${count} change${count !== 1 ? 's' : ''}`
+  } else {
+    badge.style.display = 'none'
+  }
+}
+
+function applyPreset(presetId) {
+  if (!currentDefs.length) return
+  const values = PRESETS[presetId]
+  if (!values) return
+  for (const def of currentDefs) {
+    const el = document.getElementById(`sval-${def.key}`)
+    if (!el) continue
+    if (values[def.key] !== undefined) {
+      el.value = values[def.key]
+      onSettingChange(def.key)
+    }
+  }
+  // Visual feedback on the button
+  const btn = document.querySelector(`.preset-${presetId}`)
+  if (btn) {
+    const orig = btn.innerHTML
+    btn.innerHTML = '<i class="fa fa-check"></i> Applied'
+    btn.style.opacity = '0.7'
+    setTimeout(() => { btn.innerHTML = orig; btn.style.opacity = '' }, 1800)
+  }
+}
+
+function applyRecommended() {
+  if (!currentDefs.length) return
+  for (const def of currentDefs) {
+    const el = document.getElementById(`sval-${def.key}`)
+    if (!el) continue
+    el.value = def.rec
+    onSettingChange(def.key)
+  }
+}
+
+async function saveSettings() {
+  const btn = document.getElementById('btn-save')
+  if (!currentDefs.length) return
+
+  // Collect all values — we write everything so missing keys get injected too
+  const changes = {}
+  for (const def of currentDefs) {
+    const el = document.getElementById(`sval-${def.key}`)
+    if (el) changes[def.key] = el.value
+  }
+
+  // Count actual changes vs original file
+  let changedCount = 0
+  for (const def of currentDefs) {
+    const el = document.getElementById(`sval-${def.key}`)
+    if (el && currentVals[def.key] !== null && String(el.value) !== String(currentVals[def.key])) changedCount++
+    else if (el && currentVals[def.key] === null) changedCount++ // missing key being injected
+  }
+
+  // Warn if FiveM might be running
+  const warnBanner = document.getElementById('fivem-warn-banner')
+  if (warnBanner && !warnBanner.dataset.confirmed) {
+    warnBanner.style.display = 'flex'
+    warnBanner.dataset.pendingChanges = JSON.stringify(changes)
+    return
+  }
+
+  btn.disabled = true
+  btn.innerHTML = '<i class="fa fa-spinner fa-spin"></i> Saving…'
+
+  const r = await window.api.fivemWriteSettings(changes, getManualPath())
+  btn.disabled = false
+
+  if (r.ok) {
+    btn.innerHTML = '<i class="fa fa-check"></i> Saved!'
+    if (warnBanner) { warnBanner.style.display = 'none'; delete warnBanner.dataset.confirmed }
+    document.getElementById('path-status').innerHTML =
+      `<i class="fa fa-check" style="color:#2ECC71"></i> Saved ${changedCount} change${changedCount !== 1 ? 's' : ''} → ${r.path}`
+    showSaveConfirmBanner(r.path)
+    // Sync currentVals
+    for (const def of currentDefs) {
+      const el = document.getElementById(`sval-${def.key}`)
+      if (el) currentVals[def.key] = el.value
+    }
+    for (const def of currentDefs) document.getElementById(`srow-${def.key}`)?.classList.remove('is-changed')
+    trackChanges()
+    setTimeout(() => { btn.innerHTML = '<i class="fa fa-floppy-disk"></i> Save Settings'; btn.disabled = false }, 2500)
+  } else {
+    btn.innerHTML = '<i class="fa fa-xmark"></i> Error'
+    document.getElementById('path-status').innerHTML =
+      `<i class="fa fa-triangle-exclamation" style="color:#E74C3C"></i> ${r.reason || 'Save failed'}`
+    setTimeout(() => { btn.innerHTML = '<i class="fa fa-floppy-disk"></i> Save Settings'; btn.disabled = false }, 2500)
+  }
+}
+
+function showSaveConfirmBanner(filePath) {
+  const existing = document.getElementById('save-confirm-banner')
+  if (existing) existing.remove()
+  const banner = document.createElement('div')
+  banner.id = 'save-confirm-banner'
+  banner.style.cssText = 'background:rgba(46,204,113,0.08);border:1px solid rgba(46,204,113,0.25);border-radius:8px;padding:10px 14px;display:flex;align-items:center;gap:10px;font-size:11px;color:#c0c0cc'
+  banner.innerHTML = `
+    <i class="fa fa-circle-check" style="color:#2ECC71;font-size:14px;flex-shrink:0"></i>
+    <div style="flex:1;line-height:1.5">
+      <strong style="color:#2ECC71">Settings saved successfully.</strong><br>
+      <span style="color:#8a8a9a">Close FiveM completely (not just the game), then relaunch it. Do not open Graphics Settings in FiveM after relaunching — it will overwrite these values.</span>
+    </div>
+    <button onclick="this.closest('#save-confirm-banner').remove()" style="background:none;border:none;color:#555;cursor:pointer;font-size:13px;flex-shrink:0;padding:0 4px">✕</button>
+  `
+  document.getElementById('content').insertBefore(banner, document.getElementById('settings-body'))
+}
+
+function confirmSaveAnyway() {
+  const warnBanner = document.getElementById('fivem-warn-banner')
+  if (warnBanner) {
+    warnBanner.dataset.confirmed = '1'
+    warnBanner.style.display = 'none'
+  }
+  saveSettings()
+}
+
+// Auto-load on open
+window.addEventListener('DOMContentLoaded', () => {
+  loadSettings()
+})
+</script>
+</body>
+</html>
