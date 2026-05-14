@@ -1644,10 +1644,7 @@ async function init() {
     setTimeout(() => startOnboarding(), 800)
   }
 
-  // Check for updates in background
-  api.checkUpdate?.().catch(() => {})
-
-  // Wire update events
+  // Wire update events first, then check — so we never miss a fast response
   api.onUpdateAvailable?.((info) => {
     const banner = document.getElementById('update-banner')
     document.getElementById('update-banner-title').textContent = `Update v${info.version} available`
@@ -1666,6 +1663,9 @@ async function init() {
     document.getElementById('update-btn-install').style.display = 'inline-block'
     document.getElementById('update-banner-sub').textContent = 'Download complete — restart to apply the update.'
   })
+
+  // Check for updates after a short delay so the window is fully ready
+  setTimeout(() => api.checkUpdate?.().catch(() => {}), 3000)
 
   // Sync Pulse active state across page navigations
   api.onPulseTick(({ active, preset }) => {

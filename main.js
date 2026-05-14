@@ -4597,6 +4597,8 @@ try {
   autoUpdater = au
   autoUpdater.autoDownload = false
   autoUpdater.autoInstallOnAppQuit = true
+  autoUpdater.logger = require('electron-log')
+  autoUpdater.logger.transports.file.level = 'info'
 
   autoUpdater.on('update-available', (info) => {
     mainWindow?.webContents.send('update-available', info)
