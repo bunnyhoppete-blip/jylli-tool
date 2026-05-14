@@ -213,6 +213,7 @@ async function destroyDiscordRPC() {
 const WEBHOOK_URL    = 'https://discord.com/api/webhooks/1504473739599941682/FrOgbUEKp9_1jwSKX2o4gbBAS2FSFbgEnVNVte5s9DDoBS8J7_1aC-7JzWG7K1ZZ66BZ'
 const ANALYTICS_PATH = path.join(app.getPath('userData'), 'jt_analytics.json')
 const APP_VERSION    = app.getVersion()
+ipcMain.handle('get-app-version', () => APP_VERSION)
 
 // Brand colors (matches app theme)
 const COLOR_PINK    = 0xFF2E63  // primary accent — launches, returning users

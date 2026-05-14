@@ -1168,7 +1168,7 @@ select.styled-select:focus { border-color: var(--pink); }
     <div class="load-logo-icon"><i class="fa fa-bolt"></i></div>
     <div>
       <div class="load-logo-text">Jylli Tool</div>
-      <div class="load-logo-ver">v1.2 — Detecting system specs…</div>
+      <div class="load-logo-ver" id="load-ver">v… — Detecting system specs…</div>
     </div>
   </div>
   <div class="load-steps">
@@ -1317,7 +1317,7 @@ select.styled-select:focus { border-color: var(--pink); }
       <div class="logo-icon" style="background:linear-gradient(135deg,#2a0010,#150008);box-shadow:0 0 14px rgba(255,46,99,0.22);border:1px solid rgba(255,46,99,0.55)"><i class="fa fa-bolt" style="color:var(--pink)"></i></div>
       <div>
         <span class="logo-text">Jylli Tool</span>
-        <span style="display:block;font-size:9px;color:var(--gray);margin-top:1px">v1.2</span>
+        <span style="display:block;font-size:9px;color:var(--gray);margin-top:1px" id="titlebar-ver">v…</span>
       </div>
     </div>
     <!-- Breadcrumb trail -->
@@ -1400,7 +1400,7 @@ select.styled-select:focus { border-color: var(--pink); }
       <button class="nav-btn" data-page="personalization" onclick="showPage('personalization')">
         <span class="nav-icon"><i class="fa fa-palette"></i></span><span class="nav-label">Personalization</span>
       </button>
-      <div class="sidebar-footer">v1.2 · Jylli Tool</div>
+      <div class="sidebar-footer" id="sidebar-ver">v… · Jylli Tool</div>
     </nav>
 
     <!-- Main -->
@@ -1469,6 +1469,11 @@ function _confirmModalReject()  { document.getElementById('confirm-modal').style
 async function init() {
   settings = await api.loadSettings() || {}
   initPersonalization()
+
+  const appVersion = await api.getAppVersion()
+  document.getElementById('load-ver').textContent       = `v${appVersion} — Detecting system specs…`
+  document.getElementById('titlebar-ver').textContent   = `v${appVersion}`
+  document.getElementById('sidebar-ver').textContent    = `v${appVersion} · Jylli Tool`
 
   api.onLog(({ msg, level, ts, source }) => {
     appendLog(msg, level, ts)
@@ -1595,7 +1600,7 @@ async function init() {
 
   updateAdminBadge(sysInfo.isAdmin)
 
-  appendLog(`Jylli Tool v1.2 ready.`, 'head')
+  appendLog(`Jylli Tool v${appVersion} ready.`, 'head')
   const applied = Object.entries(settings).filter(([k,v]) => k.startsWith('tweak_') && v === 'applied')
   if (applied.length) appendLog(`  ${applied.length} tweak(s) previously applied — badges restored.`, 'info')
   updateDiscordFps()
@@ -2376,7 +2381,7 @@ function wizardFinish() {
   document.getElementById('onboarding-overlay').style.display = 'none'
   settings.onboardingDone = true
   api.saveSettings(settings)
-  toast('Welcome!', 'Setup complete — enjoy Jylli Tool v1.2', 'ok', 4000)
+  toast('Welcome!', `Setup complete — enjoy Jylli Tool v${appVersion}`, 'ok', 4000)
 }
 
 function wizardChooseAutoOpti() {
