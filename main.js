@@ -606,6 +606,7 @@ function createWindow() {
     e.preventDefault()
     mainWindow.hide()
     updateTrayMenu()
+    if (discordReady) discordRPC.clearActivity().catch(() => {})
   })
 
   // Clicking the close button hides to tray; quit only from tray menu
@@ -614,6 +615,8 @@ function createWindow() {
       e.preventDefault()
       mainWindow.hide()
       updateTrayMenu()
+      // Clear Discord presence so status disappears while in tray
+      if (discordReady) discordRPC.clearActivity().catch(() => {})
     }
   })
 
@@ -674,8 +677,8 @@ function updateTrayMenu() {
     {
       label: shown ? 'Hide window' : 'Show window',
       click: () => {
-        if (shown) { mainWindow.hide() }
-        else { mainWindow.show(); mainWindow.focus() }
+        if (shown) { mainWindow.hide(); if (discordReady) discordRPC.clearActivity().catch(() => {}) }
+        else { mainWindow.show(); mainWindow.focus(); updateDiscordPresence() }
         updateTrayMenu()
       },
     },
@@ -701,7 +704,7 @@ function createTray() {
   tray.on('click', () => {
     if (mainWindow) {
       if (mainWindow.isVisible()) { mainWindow.focus() }
-      else { mainWindow.show(); mainWindow.focus() }
+      else { mainWindow.show(); mainWindow.focus(); updateDiscordPresence() }
     }
     updateTrayMenu()
   })
