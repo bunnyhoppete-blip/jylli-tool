@@ -27,7 +27,8 @@
     "publish": {
       "provider": "github",
       "owner": "bunnyhoppete-blip",
-      "repo": "jylli-tool"
+      "repo": "jylli-tool",
+      "releaseType": "release"
     }
   },
   "devDependencies": {
