@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, dialog, shell, Tray, Menu, nativeImage } = require('electron')
+const { app, BrowserWindow, ipcMain, dialog, shell, Tray, Menu, nativeImage, Notification } = require('electron')
 const path = require('path')
 const { exec, execFile, spawn } = require('child_process')
 const fs = require('fs')
@@ -6,8 +6,8 @@ const os = require('os')
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 const IS_WIN = process.platform === 'win32'
-const SETTINGS_PATH = path.join(app.getPath('userData'), 'jt_settings.json')
-const LOG_PATH = path.join(app.getPath('userData'), 'jt_log.txt')
+let SETTINGS_PATH = null
+let LOG_PATH = null
 
 let mainWindow = null
 let pulseWindow = null
@@ -55,6 +55,7 @@ const PAGE_PRESENCE = {
   'startup-manager':  { details: 'Managing Startup Apps',     image: 'jylli_logo'  },
   'ping-test':        { details: 'Testing Network Ping',      image: 'jylli_logo'  },
   'app-optimizer':    { details: 'Optimizing Apps',           image: 'jylli_logo'  },
+  'pulse':            { details: 'Configuring Pulse',          image: 'jylli_logo'  },
 }
 
 // Cycling phrases shown during long scans
@@ -117,13 +118,16 @@ function updateDiscordPresence() {
   } else if (discordPulseGame) {
     // Pulse is active for a specific game
     details   = `⚡ Pulse Active — ${discordPulseGame}`
-    state     = discordFpsGained > 0
-      ? `+${discordFpsGained} FPS · ${discordTweaksApplied} tweak${discordTweaksApplied !== 1 ? 's' : ''} applied`
+    const elapsed = pulseStartTimestamp ? Math.floor((Date.now() - pulseStartTimestamp) / 1000) : 0
+    const elMin = Math.floor(elapsed / 60), elSec = String(elapsed % 60).padStart(2, '0')
+    const elapsedStr = elapsed > 0 ? `${elMin}m ${elSec}s` : null
+    state     = elapsedStr
+      ? `${discordPulseGame} · Active ${elapsedStr}`
       : `${discordTweaksApplied} tweak${discordTweaksApplied !== 1 ? 's' : ''} applied`
     imageKey  = 'jylli_logo'
-    imageText = 'Pulse — Live Game Optimization · discord.gg/jylligraffat'
-    smallKey  = discordHasFiveM ? 'fivem_icon' : 'jylli_small'
-    smallText = discordHasFiveM ? 'FiveM detected' : 'Gaming Mode'
+    imageText = 'Jylli Tool — PC Optimizer'
+    smallKey  = 'jylli_small'
+    smallText = '⚡ Pulse Active'
   } else if (discordActiveGame) {
     // Game watcher detected a running game
     details   = `🎮 In-Game — ${discordActiveGame}`
@@ -131,7 +135,7 @@ function updateDiscordPresence() {
       ? `+${discordFpsGained} FPS gained from tweaks`
       : `${discordTweaksApplied} tweak${discordTweaksApplied !== 1 ? 's' : ''} applied`
     imageKey  = 'jylli_logo'
-    imageText = 'Jylli Tool — Game Watcher Active · discord.gg/jylligraffat'
+    imageText = 'Jylli Tool — PC Optimizer'
     smallKey  = discordHasFiveM ? 'fivem_icon' : 'jylli_small'
     smallText = discordHasFiveM ? 'FiveM detected' : 'Jylli Tool'
   } else {
@@ -144,7 +148,7 @@ function updateDiscordPresence() {
         ? `${discordTweaksApplied} tweak${discordTweaksApplied !== 1 ? 's' : ''} applied`
         : 'discord.gg/jylligraffat'
     imageKey  = p.image
-    imageText = 'Jylli Tool — Windows Optimizer · discord.gg/jylligraffat'
+    imageText = 'Jylli Tool — PC Optimizer'
     smallKey  = discordHasFiveM ? 'fivem_icon' : 'jylli_small'
     smallText = discordHasFiveM ? 'FiveM detected' : 'Jylli Tool'
   }
@@ -217,16 +221,14 @@ async function destroyDiscordRPC() {
 
 // ─── Analytics Webhook ───────────────────────────────────────────────────────
 const WEBHOOK_URL    = 'https://discord.com/api/webhooks/1504473739599941682/FrOgbUEKp9_1jwSKX2o4gbBAS2FSFbgEnVNVte5s9DDoBS8J7_1aC-7JzWG7K1ZZ66BZ'
-const ANALYTICS_PATH = path.join(app.getPath('userData'), 'jt_analytics.json')
-const APP_VERSION    = app.getVersion()
-ipcMain.handle('get-app-version', () => APP_VERSION)
+let ANALYTICS_PATH = null
+let APP_VERSION    = null
 
 // Brand colors (matches app theme)
 const COLOR_PINK    = 0xFF2E63  // primary accent — launches, returning users
 const COLOR_GREEN   = 0x2ECC71  // new installs
 const COLOR_ERROR   = 0xFF2E63  // crashes
 const COLOR_WARNING = 0xFF6B35  // non-fatal errors
-const COLOR_BLUE    = 0x3498DB  // auto-opti complete
 const COLOR_PURPLE  = 0x9B59B6  // session end / uninstall
 
 // Session start time — used to calculate duration on quit
@@ -288,81 +290,78 @@ function webhookLaunch() {
     const nowIso = now.toISOString()
     const nowMs  = now.getTime()
 
-    // First-ever run on this machine
     const isNewUser = !analytics.userId
     if (isNewUser) {
-      analytics.userId    = require('crypto').randomBytes(8).toString('hex')
-      analytics.firstSeen = nowIso
-      analytics.sessions  = 0
+      analytics.userId             = require('crypto').randomBytes(8).toString('hex')
+      analytics.firstSeen          = nowIso
+      analytics.sessions           = 0
       analytics.totalTweaksApplied = 0
     }
 
-    analytics.sessions      = (analytics.sessions || 0) + 1
-    analytics.version       = APP_VERSION
-    const lastSeenIso       = analytics.lastSeen || null
-    analytics.lastSeen      = nowIso
-
-    // Track session dates for activity windows (keep 90 days)
-    analytics.sessionDates = (analytics.sessionDates || [])
-      .filter(d => nowMs - new Date(d).getTime() < 90 * 86400000)
-    analytics.sessionDates.push(nowIso)
-
-    // Track versions seen
-    analytics.versionHistory = analytics.versionHistory || []
-    if (!analytics.versionHistory.includes(APP_VERSION)) analytics.versionHistory.push(APP_VERSION)
-
+    analytics.sessions = (analytics.sessions || 0) + 1
+    analytics.version  = APP_VERSION
+    const lastSeenIso  = analytics.lastSeen || null
+    analytics.lastSeen = nowIso
     saveAnalytics(analytics)
 
-    const dau7  = analytics.sessionDates.filter(d => nowMs - new Date(d).getTime() < 7  * 86400000).length
-    const dau30 = analytics.sessionDates.filter(d => nowMs - new Date(d).getTime() < 30 * 86400000).length
-    const { winVer, ram, cpu, hasFiveM, gpu, isLaptop, isWifi } = getSystemFields()
+    const { winVer, ram, cpu, gpu } = getSystemFields()
+    const ts = Math.floor(nowMs / 1000)
 
-    const ts          = Math.floor(nowMs / 1000)
-    const firstSeenTs = Math.floor(new Date(analytics.firstSeen).getTime() / 1000)
-    const daysSinceLast = lastSeenIso
-      ? Math.floor((nowMs - new Date(lastSeenIso).getTime()) / 86400000) : null
-    const returnLabel = daysSinceLast === null ? '—'
-      : daysSinceLast === 0 ? 'Today'
-      : daysSinceLast === 1 ? '1 day ago'
-      : `${daysSinceLast} days ago`
-
-    const deviceType = isLaptop ? '💻 Laptop' : '🖥️ Desktop'
-    const netType    = isWifi   ? '📶 Wi-Fi'  : '🔌 Ethernet'
-
-    sendWebhook({
-      username: 'Jylli Tool',
-      embeds: [{
-        color: isNewUser ? COLOR_GREEN : COLOR_PINK,
-        title: isNewUser ? '🎉  New User' : '▶  User Session',
-        description: isNewUser
-          ? `First ever launch on this machine. **Welcome to Jylli Tool v${APP_VERSION}!**`
-          : `Returning user — last seen **${returnLabel}** · session **#${analytics.sessions}**`,
-        fields: [
-          { name: '🪪  User ID',        value: `\`${analytics.userId}\``,                                  inline: true },
-          { name: '📦  Version',        value: `**v${APP_VERSION}**`,                                      inline: true },
-          { name: '📅  Time',           value: `<t:${ts}:f>`,                                              inline: true },
-          { name: '🖥️  OS',             value: winVer,                                                     inline: true },
-          { name: '⚙️  CPU',            value: `\`${cpu.length > 28 ? cpu.slice(0, 28) + '…' : cpu}\``,   inline: true },
-          { name: '🧠  RAM',            value: ram,                                                        inline: true },
-          ...(gpu ? [{ name: '🎨  GPU', value: `\`${gpu.length > 28 ? gpu.slice(0, 28) + '…' : gpu}\``,   inline: true }] : []),
-          { name: '🎮  FiveM',          value: hasFiveM ? '✅ Installed' : '❌ Not found',                 inline: true },
-          { name: '🖱️  Device',         value: deviceType,                                                 inline: true },
-          { name: '🌐  Network',        value: netType,                                                    inline: true },
-          { name: '📊  Active (7d)',    value: `**${dau7}** session${dau7  !== 1 ? 's' : ''}`,             inline: true },
-          { name: '📈  Active (30d)',   value: `**${dau30}** session${dau30 !== 1 ? 's' : ''}`,            inline: true },
-          { name: '📆  First Seen',     value: `<t:${firstSeenTs}:D>`,                                     inline: true },
-          { name: '🔧  Tweaks Ever',    value: `**${analytics.totalTweaksApplied || 0}**`,                 inline: true },
-          { name: '🔢  Total Sessions', value: `**${analytics.sessions}**`,                                inline: true },
-          { name: '📚  Versions Used',  value: analytics.versionHistory?.join(', ') || `v${APP_VERSION}`, inline: true },
-        ],
-        footer: { text: `Jylli Tool  ·  v${APP_VERSION}  ·  Analytics` },
-        timestamp: nowIso,
-      }]
-    })
+    if (isNewUser) {
+      sendWebhook({
+        username: 'Jylli Tool',
+        embeds: [{
+          color: COLOR_GREEN,
+          title: '🟢  New Install',
+          description: `First launch on this machine — **v${APP_VERSION}**`,
+          fields: [
+            { name: '📅  Time',           value: `<t:${ts}:f>`,                                            inline: true },
+            { name: '🪪  User ID',        value: `\`${analytics.userId}\``,                                inline: true },
+            { name: '​',             value: '​',                                                 inline: true },
+            { name: '⚙️  CPU',            value: `\`${cpu.length > 32 ? cpu.slice(0, 32) + '…' : cpu}\``, inline: true },
+            { name: '🧠  RAM',            value: ram,                                                      inline: true },
+            ...(gpu ? [{ name: '🎮  GPU', value: `\`${gpu.length > 32 ? gpu.slice(0, 32) + '…' : gpu}\``, inline: true }] : [{ name: '🎮  GPU', value: '—', inline: true }]),
+            { name: '🖥️  OS',             value: winVer,                                                   inline: true },
+            { name: '🔧  Tweaks Applied', value: '**0**',                                                  inline: true },
+            { name: '🔢  Session',        value: '**#1**',                                                 inline: true },
+          ],
+          footer: { text: `Jylli Tool  ·  v${APP_VERSION}` },
+          timestamp: nowIso,
+        }]
+      })
+    } else {
+      const daysSinceLast = lastSeenIso
+        ? Math.floor((nowMs - new Date(lastSeenIso).getTime()) / 86400000) : null
+      const lastSeenLabel = daysSinceLast === null ? '—'
+        : daysSinceLast === 0 ? 'Today'
+        : daysSinceLast === 1 ? 'Yesterday'
+        : `${daysSinceLast} days ago`
+      sendWebhook({
+        username: 'Jylli Tool',
+        embeds: [{
+          color: COLOR_PINK,
+          title: '▶  Session Start',
+          description: `Session **#${analytics.sessions}** — last seen **${lastSeenLabel}** — **v${APP_VERSION}**`,
+          fields: [
+            { name: '📅  Time',           value: `<t:${ts}:f>`,                                            inline: true },
+            { name: '🪪  User ID',        value: `\`${analytics.userId}\``,                                inline: true },
+            { name: '​',             value: '​',                                                 inline: true },
+            { name: '⚙️  CPU',            value: `\`${cpu.length > 32 ? cpu.slice(0, 32) + '…' : cpu}\``, inline: true },
+            { name: '🧠  RAM',            value: ram,                                                      inline: true },
+            ...(gpu ? [{ name: '🎮  GPU', value: `\`${gpu.length > 32 ? gpu.slice(0, 32) + '…' : gpu}\``, inline: true }] : [{ name: '🎮  GPU', value: '—', inline: true }]),
+            { name: '🖥️  OS',             value: winVer,                                                   inline: true },
+            { name: '🔧  Tweaks Applied', value: `**${analytics.totalTweaksApplied || 0}** lifetime`,      inline: true },
+            { name: '🔢  Sessions',       value: `**${analytics.sessions}**`,                              inline: true },
+          ],
+          footer: { text: `Jylli Tool  ·  v${APP_VERSION}` },
+          timestamp: nowIso,
+        }]
+      })
+    }
   } catch {}
 }
 
-function webhookSessionEnd(durationMs, pageVisits, tweaksThisSession, pulseUses) {
+function webhookSessionEnd(durationMs, pageVisits, tweaksThisSession) {
   try {
     const analytics = loadAnalytics()
     if (!analytics.userId) return
@@ -371,15 +370,7 @@ function webhookSessionEnd(durationMs, pageVisits, tweaksThisSession, pulseUses)
     const secs = Math.floor((durationMs % 60000) / 1000)
     const durationLabel = mins > 0 ? `${mins}m ${secs}s` : `${secs}s`
 
-    // Top 3 most visited pages this session
-    const sortedPages = Object.entries(pageVisits || {}).sort((a, b) => b[1] - a[1])
-    const topPagesLabel = sortedPages.length
-      ? sortedPages.slice(0, 3).map(([p, n]) => `**${p}** ×${n}`).join(', ')
-      : '—'
-
-    // Update lifetime tweaks count
     analytics.totalTweaksApplied = (analytics.totalTweaksApplied || 0) + (tweaksThisSession || 0)
-    analytics.totalPulseUses = (analytics.totalPulseUses || 0) + (pulseUses || 0)
     saveAnalytics(analytics)
 
     const ts = Math.floor(Date.now() / 1000)
@@ -387,117 +378,16 @@ function webhookSessionEnd(durationMs, pageVisits, tweaksThisSession, pulseUses)
       username: 'Jylli Tool',
       embeds: [{
         color: COLOR_PURPLE,
-        title: '🔴  Session Ended',
-        description: `User closed Jylli Tool after **${durationLabel}**.`,
+        title: '🔴  Session End',
+        description: `**${durationLabel}** session — v${APP_VERSION}`,
         fields: [
-          { name: '🪪  User ID',         value: `\`${analytics.userId}\``,             inline: true },
-          { name: '⏱️  Duration',         value: `**${durationLabel}**`,                inline: true },
-          { name: '📅  Time',            value: `<t:${ts}:f>`,                          inline: true },
-          { name: '📄  Top Pages',       value: topPagesLabel,                          inline: false },
-          { name: '🔧  Tweaks Applied',  value: `**${tweaksThisSession || 0}**`,        inline: true },
-          { name: '🔧  Lifetime Tweaks', value: `**${analytics.totalTweaksApplied}**`,  inline: true },
-          { name: '⚡  Pulse Uses',      value: `**${pulseUses || 0}** this session · **${analytics.totalPulseUses}** lifetime`, inline: false },
+          { name: '🪪  User',           value: `\`${analytics.userId}\``,                                                           inline: true },
+          { name: '⏱️  Duration',        value: `**${durationLabel}**`,                                                              inline: true },
+          { name: '📅  Time',           value: `<t:${ts}:f>`,                                                                       inline: true },
+          { name: '🔧  Tweaks Applied', value: `**${tweaksThisSession || 0}** this session  ·  **${analytics.totalTweaksApplied}** lifetime`, inline: false },
+          { name: '🔢  Sessions',       value: `**${analytics.sessions || 1}**`,                                                    inline: true },
         ],
-        footer: { text: `Jylli Tool  ·  v${APP_VERSION}  ·  Analytics` },
-        timestamp: new Date().toISOString(),
-      }]
-    })
-  } catch {}
-}
-
-function webhookPulseActivated(gameName, optimizations) {
-  try {
-    const analytics = loadAnalytics()
-    const userId = analytics.userId || 'unknown'
-    const ts = Math.floor(Date.now() / 1000)
-    sendWebhook({
-      username: 'Jylli Tool',
-      embeds: [{
-        color: COLOR_PINK,
-        title: '⚡  Pulse Activated',
-        description: `User activated Pulse for **${gameName}**.`,
-        fields: [
-          { name: '🪪  User ID',         value: `\`${userId}\``,              inline: true },
-          { name: '🎮  Game',            value: `**${gameName}**`,             inline: true },
-          { name: '📅  Time',            value: `<t:${ts}:f>`,                 inline: true },
-          { name: '🔩  Optimizations',   value: optimizations.map(o => `• ${o}`).join('\n'), inline: false },
-        ],
-        footer: { text: `Jylli Tool  ·  v${APP_VERSION}  ·  Analytics` },
-        timestamp: new Date().toISOString(),
-      }]
-    })
-  } catch {}
-}
-
-function webhookAutoOpti(tweakCount, fpsEstimate, includedFiveM) {
-  try {
-    const analytics = loadAnalytics()
-    const userId = analytics.userId || 'unknown'
-    analytics.autoOptiRuns = (analytics.autoOptiRuns || 0) + 1
-    analytics.totalTweaksApplied = (analytics.totalTweaksApplied || 0) + tweakCount
-    saveAnalytics(analytics)
-
-    const ts = Math.floor(Date.now() / 1000)
-    sendWebhook({
-      username: 'Jylli Tool',
-      embeds: [{
-        color: COLOR_BLUE,
-        title: '⚡  Auto-Optimize Completed',
-        description: `User ran Auto-Optimize and applied **${tweakCount} tweaks** — estimated **~+${fpsEstimate} FPS** gained.`,
-        fields: [
-          { name: '🪪  User ID',       value: `\`${userId}\``,                           inline: true },
-          { name: '🔧  Tweaks Applied',value: `**${tweakCount}**`,                        inline: true },
-          { name: '📈  FPS Estimate',  value: `**~+${fpsEstimate} FPS**`,                 inline: true },
-          { name: '🎮  FiveM Tweaks',  value: includedFiveM ? '✅ Included' : '❌ Skipped', inline: true },
-          { name: '🔁  Run #',         value: `**${analytics.autoOptiRuns}**`,            inline: true },
-          { name: '📅  Time',          value: `<t:${ts}:f>`,                              inline: true },
-        ],
-        footer: { text: `Jylli Tool  ·  v${APP_VERSION}  ·  Analytics` },
-        timestamp: new Date().toISOString(),
-      }]
-    })
-  } catch {}
-}
-
-function webhookHealthCheck(results) {
-  try {
-    const analytics = loadAnalytics()
-    const userId = analytics.userId || 'unknown'
-
-    const sfcLabel  = results.sfc  === 'clean'    ? '✅ Clean'
-      : results.sfc  === 'corrupt'  ? '❌ Corrupt files found'
-      : results.sfc  === 'pending'  ? '⏳ Pending reboot'
-      : '❓ Unknown'
-    const dismLabel = results.dism === 'healthy'   ? '✅ Healthy'
-      : results.dism === 'repairable' ? '⚠️ Repairable'
-      : results.dism === 'corrupted'  ? '❌ Corrupted'
-      : '❓ Unknown'
-    const diskLabel = results.disk === 'healthy'   ? '✅ Healthy'
-      : results.disk === 'warning'    ? '⚠️ Warning'
-      : results.disk === 'failing'    ? '❌ Failing'
-      : '❓ Unknown'
-
-    const hasIssues = !results.ok
-    const ts = Math.floor(Date.now() / 1000)
-
-    sendWebhook({
-      username: 'Jylli Tool',
-      embeds: [{
-        color: hasIssues ? COLOR_WARNING : COLOR_GREEN,
-        title: hasIssues ? '⚠️  Windows Health — Issues Found' : '✅  Windows Health — All Clear',
-        description: hasIssues
-          ? `Health check found **${results.issues?.length || 1} issue(s)** on this system.`
-          : `System passed all health checks.`,
-        fields: [
-          { name: '🪪  User ID',  value: `\`${userId}\``, inline: true },
-          { name: '📅  Time',     value: `<t:${ts}:f>`,   inline: true },
-          { name: '​',       value: '​',         inline: true },
-          { name: '🛡️  SFC',      value: sfcLabel,         inline: true },
-          { name: '🏥  DISM',     value: dismLabel,        inline: true },
-          { name: '💾  Disk',     value: diskLabel,        inline: true },
-          ...(hasIssues ? [{ name: '📋  Issues', value: results.issues.map(i => `• ${i}`).join('\n').slice(0, 900) }] : []),
-        ],
-        footer: { text: `Jylli Tool  ·  v${APP_VERSION}  ·  Analytics` },
+        footer: { text: `Jylli Tool  ·  v${APP_VERSION}` },
         timestamp: new Date().toISOString(),
       }]
     })
@@ -744,16 +634,24 @@ if (IS_WIN) {
 }
 
 // Session-level tracking (populated by renderer via IPC)
-let sessionPageVisits   = {}
-let sessionTweaksCount  = 0
-let sessionPulseUses    = 0
+let sessionPageVisits  = {}
+let sessionTweaksCount = 0
 
-app.whenReady().then(() => { createWindow(); createTray(); initDiscordRPC(); webhookLaunch() })
+app.whenReady().then(() => {
+  const userData = app.getPath('userData')
+  SETTINGS_PATH  = path.join(userData, 'jt_settings.json')
+  LOG_PATH       = path.join(userData, 'jt_log.txt')
+  ANALYTICS_PATH = path.join(userData, 'jt_analytics.json')
+  PROFILES_PATH  = path.join(userData, 'jt_profiles.json')
+  CHANGELOG_PATH = path.join(userData, 'jt_changelog.json')
+  APP_VERSION    = app.getVersion()
+  createWindow(); createTray(); initDiscordRPC(); webhookLaunch()
+})
 app.on('window-all-closed', () => { /* stay alive in tray */ })
 app.on('will-quit', (e) => {
   e.preventDefault()
   const duration = Date.now() - sessionStartTime
-  if (duration > 10000) webhookSessionEnd(duration, sessionPageVisits, sessionTweaksCount, sessionPulseUses)
+  if (duration > 10000) webhookSessionEnd(duration, sessionPageVisits, sessionTweaksCount)
   // Await clearActivity so Discord status is actually removed before the process exits
   destroyDiscordRPC().finally(() => app.exit(0))
 })
@@ -1218,6 +1116,7 @@ Write-Output "DOMAIN=$($sys.PartOfDomain)"
 
 // ─── IPC Handlers ─────────────────────────────────────────────────────────────
 
+ipcMain.handle('get-app-version', () => APP_VERSION)
 ipcMain.handle('get-system-info', async () => {
   const info = await detectSystemInfo()
   // Cache fields for webhook use (webhookLaunch fires before detectSystemInfo completes)
@@ -1254,7 +1153,7 @@ ipcMain.handle('load-settings', () => loadSettings())
 ipcMain.handle('save-settings', (_, data) => { saveSettings(data); return true })
 
 // ─── Tweak Profiles ───────────────────────────────────────────────────────────
-const PROFILES_PATH = path.join(app.getPath('userData'), 'jt_profiles.json')
+let PROFILES_PATH = null
 function loadProfiles() {
   try { return JSON.parse(fs.readFileSync(PROFILES_PATH, 'utf8')) } catch { return {} }
 }
@@ -1601,6 +1500,16 @@ ipcMain.handle('remove-devices', async (_, ids) => {
   return { ok: true }
 })
 
+ipcMain.handle('check-lghub', async () => {
+  const r = await runPS(`
+    $s = Get-Service -Name LGHUBUpdaterService -EA SilentlyContinue
+    if ($s -and $s.StartType -ne 'Disabled') { Write-Output "SVC:1" } else { Write-Output "SVC:0" }
+    $p = Get-Process -Name lghub_system_tray,lghub_updater,lghub -EA SilentlyContinue
+    if ($p) { Write-Output "PROC:1" } else { Write-Output "PROC:0" }
+  `).catch(() => ({ out: '' }))
+  return { present: r.out.includes('SVC:1') || r.out.includes('PROC:1') }
+})
+
 // ─── FiveM in-game settings (gta5_settings.xml) ──────────────────────────────
 // Format: <KeyName value="val" /> inside <graphics> block
 const FIVEM_SETTINGS_DEFS = [
@@ -1861,6 +1770,21 @@ ipcMain.handle('run-auto-opti', async (_, sysInfo) => {
     }
   }
 
+  // If any USB tweaks were applied, disable LGHUB service to prevent phantom HID re-registration
+  const usbTweaksApplied = (selected || []).some(id => id === 'usb-suspend' || id === 'usb-power-guard')
+  if (usbTweaksApplied) {
+    send('  Checking for Logitech G HUB (phantom keyboard source)…', 'info')
+    await runPS(`
+      $svc = Get-Service -Name LGHUBUpdaterService -EA SilentlyContinue
+      if ($svc -and $svc.StartType -ne 'Disabled') {
+        Stop-Service  -Name LGHUBUpdaterService -Force -EA SilentlyContinue
+        Set-Service   -Name LGHUBUpdaterService -StartupType Disabled -EA SilentlyContinue
+      }
+      Get-Process -Name lghub,lghub_system_tray,lghub_updater,lghub_agent -EA SilentlyContinue | Stop-Process -Force -EA SilentlyContinue
+      Remove-ItemProperty -Path 'HKCU:\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Run' -Name 'LGHUB' -EA SilentlyContinue
+    `).catch(() => {})
+  }
+
   send('✓ Auto-Optimization complete! Reboot recommended.', 'ok')
   progress(999, 999, 'Complete!')
   clearDiscordOverride()
@@ -1870,8 +1794,6 @@ ipcMain.handle('run-auto-opti', async (_, sysInfo) => {
   const includedFiveM  = (selected || []).some(id => id.startsWith('fivem-'))
   const fpsEst         = sysInfo?.fpsEstimate || 0
   sessionTweaksCount  += tweakCount
-  webhookAutoOpti(tweakCount, fpsEst, includedFiveM)
-
   return { ok: true }
 })
 
@@ -2012,11 +1934,34 @@ function buildAutoOptiSteps(si) {
   })
 
   if (!si?.isLaptop) {
-    add('Import Ultimate Performance power plan', async (s, _, cmd) => {
+    add('Apply CPU-specific max performance power plan', async (s, ps, _, cmd) => {
+      const cpuR = await ps('(Get-CimInstance Win32_Processor | Select-Object -First 1).Name')
+      const cpuName = cpuR.out.trim()
+      const isAMD = cpuName.toLowerCase().includes('amd')
+      const isIntel = cpuName.toLowerCase().includes('intel')
+      if (!isAMD && !isIntel) { s(`Unknown CPU: ${cpuName} — skipping power plan.`, 'warn'); return }
       const r = await cmd('powercfg -duplicatescheme e9a42b02-d5df-448d-aa00-03f14749eb61')
       const m = r.out.match(/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})/i)
-      if (m) { await cmd(`powercfg -setactive ${m[1]}`); s('Ultimate Performance activated.', 'ok') }
-      else s('Could not import power plan (may already exist).', 'warn')
+      if (!m) { s('Could not create power plan.', 'warn'); return }
+      const g = m[1]
+      if (isIntel) {
+        await cmd(`powercfg /changename ${g} "Intel Max Performance" "Jylli Tool - Intel-optimised max performance plan"`)
+        await cmd(`powercfg /setacvalueindex ${g} SUB_PROCESSOR PERFAUTONOMOUS 1`)
+      } else {
+        await cmd(`powercfg /changename ${g} "AMD Max Performance" "Jylli Tool - AMD-optimised max performance plan"`)
+        await cmd(`powercfg /setacvalueindex ${g} SUB_PROCESSOR CPPCENABLED 1`)
+      }
+      await cmd(`powercfg /setacvalueindex ${g} SUB_PROCESSOR PERFBOOSTMODE 2`)
+      await cmd(`powercfg /setacvalueindex ${g} SUB_PROCESSOR PROCTHROTTLEMIN 100`)
+      await cmd(`powercfg /setacvalueindex ${g} SUB_PROCESSOR PROCTHROTTLEMAX 100`)
+      await cmd(`powercfg /setacvalueindex ${g} SUB_PROCESSOR IDLEPROMOTE 0`)
+      await cmd(`powercfg /setacvalueindex ${g} SUB_PROCESSOR IDLEDEMOTE 0`)
+      await cmd(`powercfg /setacvalueindex ${g} SUB_PROCESSOR IDLETIME 0`)
+      await cmd(`powercfg /setacvalueindex ${g} SUB_PROCESSOR CPMINCORES 100`)
+      await cmd(`powercfg /setacvalueindex ${g} 501a4d13-42af-4429-9ac1-df54c6bf3fc2 ee12f906-d277-404b-b6da-e5fa1a576df5 0`)
+      await cmd(`powercfg /setacvalueindex ${g} 2a737441-1930-4402-8d77-b2bebba308a3 48e6b7a6-50f5-4782-a5d4-53bb8f07e226 0`)
+      await cmd(`powercfg -setactive ${g}`)
+      s(`${isIntel ? 'Intel' : 'AMD'} Max Performance plan activated.`, 'ok')
     })
   }
 
@@ -2481,17 +2426,59 @@ const TWEAKS = {
       s('HDCP restored.', 'ok')
     }
   },
-  'ultimate-perf': {
-    apply: async (s, _, cmd) => {
+  'intel-power-plan': {
+    apply: async (s, ps, _, cmd) => {
+      s('Detecting CPU…', 'info')
+      const cpuR = await ps('(Get-CimInstance Win32_Processor | Select-Object -First 1).Name')
+      const cpuName = cpuR.out.trim()
+      if (!cpuName.toLowerCase().includes('intel')) { s(`CPU detected: ${cpuName} — this plan is for Intel CPUs.`, 'warn'); return }
+      s(`Intel CPU: ${cpuName}`, 'info')
       const r = await cmd('powercfg -duplicatescheme e9a42b02-d5df-448d-aa00-03f14749eb61')
       const m = r.out.match(/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})/i)
-      if (m) { await cmd(`powercfg -setactive ${m[1]}`); s(`Ultimate Performance activated (${m[1]}).`, 'ok') }
-      else s('Could not import plan — it may already exist.', 'warn')
+      if (!m) { s('Could not create power plan.', 'warn'); return }
+      const g = m[1]
+      await cmd(`powercfg /changename ${g} "Intel Max Performance" "Jylli Tool - Intel-optimised max performance plan"`)
+      await cmd(`powercfg /setacvalueindex ${g} SUB_PROCESSOR PERFBOOSTMODE 2`)
+      await cmd(`powercfg /setacvalueindex ${g} SUB_PROCESSOR PERFAUTONOMOUS 1`)
+      await cmd(`powercfg /setacvalueindex ${g} SUB_PROCESSOR PROCTHROTTLEMIN 100`)
+      await cmd(`powercfg /setacvalueindex ${g} SUB_PROCESSOR PROCTHROTTLEMAX 100`)
+      await cmd(`powercfg /setacvalueindex ${g} SUB_PROCESSOR IDLEPROMOTE 0`)
+      await cmd(`powercfg /setacvalueindex ${g} SUB_PROCESSOR IDLEDEMOTE 0`)
+      await cmd(`powercfg /setacvalueindex ${g} SUB_PROCESSOR IDLETIME 0`)
+      await cmd(`powercfg /setacvalueindex ${g} SUB_PROCESSOR CPMINCORES 100`)
+      await cmd(`powercfg /setacvalueindex ${g} 501a4d13-42af-4429-9ac1-df54c6bf3fc2 ee12f906-d277-404b-b6da-e5fa1a576df5 0`)
+      await cmd(`powercfg /setacvalueindex ${g} 2a737441-1930-4402-8d77-b2bebba308a3 48e6b7a6-50f5-4782-a5d4-53bb8f07e226 0`)
+      await cmd(`powercfg -setactive ${g}`)
+      s('Intel Max Performance plan activated — Speed Shift on, aggressive boost, no idle. Reboot recommended.', 'ok')
     },
-    restore: async (s, _, cmd) => {
-      await cmd('powercfg -setactive 381b4222-f694-41f0-9685-ff5bb260df2e')
-      s('Balanced power plan activated.', 'ok')
-    }
+    restore: async (s, _, cmd) => { await cmd('powercfg -setactive 381b4222-f694-41f0-9685-ff5bb260df2e'); s('Balanced power plan restored.', 'ok') }
+  },
+  'amd-power-plan': {
+    apply: async (s, ps, _, cmd) => {
+      s('Detecting CPU…', 'info')
+      const cpuR = await ps('(Get-CimInstance Win32_Processor | Select-Object -First 1).Name')
+      const cpuName = cpuR.out.trim()
+      if (!cpuName.toLowerCase().includes('amd')) { s(`CPU detected: ${cpuName} — this plan is for AMD CPUs.`, 'warn'); return }
+      s(`AMD CPU: ${cpuName}`, 'info')
+      const r = await cmd('powercfg -duplicatescheme e9a42b02-d5df-448d-aa00-03f14749eb61')
+      const m = r.out.match(/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})/i)
+      if (!m) { s('Could not create power plan.', 'warn'); return }
+      const g = m[1]
+      await cmd(`powercfg /changename ${g} "AMD Max Performance" "Jylli Tool - AMD-optimised max performance plan"`)
+      await cmd(`powercfg /setacvalueindex ${g} SUB_PROCESSOR PERFBOOSTMODE 2`)
+      await cmd(`powercfg /setacvalueindex ${g} SUB_PROCESSOR CPPCENABLED 1`)
+      await cmd(`powercfg /setacvalueindex ${g} SUB_PROCESSOR PROCTHROTTLEMIN 100`)
+      await cmd(`powercfg /setacvalueindex ${g} SUB_PROCESSOR PROCTHROTTLEMAX 100`)
+      await cmd(`powercfg /setacvalueindex ${g} SUB_PROCESSOR IDLEPROMOTE 0`)
+      await cmd(`powercfg /setacvalueindex ${g} SUB_PROCESSOR IDLEDEMOTE 0`)
+      await cmd(`powercfg /setacvalueindex ${g} SUB_PROCESSOR IDLETIME 0`)
+      await cmd(`powercfg /setacvalueindex ${g} SUB_PROCESSOR CPMINCORES 100`)
+      await cmd(`powercfg /setacvalueindex ${g} 501a4d13-42af-4429-9ac1-df54c6bf3fc2 ee12f906-d277-404b-b6da-e5fa1a576df5 0`)
+      await cmd(`powercfg /setacvalueindex ${g} 2a737441-1930-4402-8d77-b2bebba308a3 48e6b7a6-50f5-4782-a5d4-53bb8f07e226 0`)
+      await cmd(`powercfg -setactive ${g}`)
+      s('AMD Max Performance plan activated — CPPC preferred cores on, aggressive boost, no idle. Reboot recommended.', 'ok')
+    },
+    restore: async (s, _, cmd) => { await cmd('powercfg -setactive 381b4222-f694-41f0-9685-ff5bb260df2e'); s('Balanced power plan restored.', 'ok') }
   },
   'cpu-parking': {
     apply: async (s, _, cmd) => { await cmd('powercfg /setacvalueindex SCHEME_CURRENT SUB_PROCESSOR CPMINCORES 100'); await cmd('powercfg /setactive SCHEME_CURRENT'); s('CPU core parking disabled.', 'ok') },
@@ -2579,11 +2566,10 @@ const TWEAKS = {
     apply: async (s, ps) => {
       const adapters = await ps("Get-NetAdapter | Where-Object {$_.Status -eq 'Up'} | Select-Object -ExpandProperty Name")
       for (const a of adapters.out.split('\n').map(l => l.trim()).filter(Boolean)) {
-        await require('child_process').execFileSync ? null : null
-        const cmd2 = require('child_process').execFile
-        const r1 = await new Promise(res => require('child_process').exec(`netsh interface ip set dns name="${a}" static 1.1.1.1 primary`, { windowsHide: true }, (e, o) => res({ ok: !e })))
-        const r2 = await new Promise(res => require('child_process').exec(`netsh interface ip add dns name="${a}" 1.0.0.1 index=2`, { windowsHide: true }, (e, o) => res({ ok: !e })))
-        s(`  ${a}: Cloudflare 1.1.1.1 set`, 'ok')
+        const r1 = await new Promise(res => require('child_process').exec(`netsh interface ip set dns name="${a}" static 1.1.1.1 primary`, { windowsHide: true }, (e) => res({ ok: !e })))
+        const r2 = await new Promise(res => require('child_process').exec(`netsh interface ip add dns name="${a}" 1.0.0.1 index=2`, { windowsHide: true }, (e) => res({ ok: !e })))
+        if (r1.ok && r2.ok) s(`  ${a}: Cloudflare 1.1.1.1 set`, 'ok')
+        else s(`  ${a}: DNS set failed`, 'warn')
       }
     },
     restore: async (s, ps) => {
@@ -3627,6 +3613,224 @@ ${c}
     },
     restore: async (s) => s('Search fix does not need reverting.', 'info')
   },
+  'fix-usb-ghosting': {
+    apply: async (s, ps, _, cmd) => {
+      // ── 1. Get active scheme GUID upfront (needed for /setactive at the end) ──
+      const activeScheme = await runPS(`(powercfg /getactivescheme) -replace '.*GUID:\\s+(\\S+).*','$1'`).then(r => r.out.trim()).catch(() => '')
+      const allSchemes   = await runPS(`powercfg /list | Select-String 'Power Scheme GUID' | ForEach-Object { ($_ -split ':\\s+')[1].Split(' ')[0] }`).then(r => r.out.trim().split(/\r?\n/).filter(Boolean)).catch(() => [])
+
+      // ── 2. USB selective suspend — restore across all schemes ─────────────────
+      s('Restoring USB selective suspend…', 'info')
+      const usbGuid = '2a737441-1930-4402-8d77-b2bebba308a3'
+      const usbSub  = '48e6b7a6-50f5-4782-a5d4-53bb8f07e226'
+      for (const scheme of allSchemes) {
+        await runPS(`powercfg /setacvalueindex ${scheme} ${usbGuid} ${usbSub} 1 2>$null`).catch(() => {})
+        await runPS(`powercfg /setdcvalueindex ${scheme} ${usbGuid} ${usbSub} 1 2>$null`).catch(() => {})
+      }
+      await ps('Remove-ItemProperty -Path "HKLM:\\SYSTEM\\CurrentControlSet\\Services\\usb" -Name DisableSelectiveSuspend -EA SilentlyContinue')
+
+      // ── 3. MMCSS SystemResponsiveness — 0 starves USB HID entirely ────────────
+      s('Checking MMCSS SystemResponsiveness…', 'info')
+      await ps(`
+        $base = 'HKLM:\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\Multimedia\\SystemProfile'
+        $cur = (Get-ItemProperty -Path $base -EA SilentlyContinue).SystemResponsiveness
+        if ($cur -eq $null -or [int]$cur -lt 10) {
+          Set-ItemProperty -Path $base -Name SystemResponsiveness -Value 20 -Force
+          Write-Output "MMCSS_FIXED"
+        }
+      `)
+
+      // ── 4. Clear PCI interrupt affinity overrides (GPU/NIC) ───────────────────
+      s('Clearing PCI interrupt affinity overrides…', 'info')
+      await ps(`
+        $pciBase  = 'HKLM:\\SYSTEM\\CurrentControlSet\\Enum\\PCI'
+        $netGuid  = '{4d36e972-e325-11ce-bfc1-08002be10318}'
+        $dispGuid = '{4d36e968-e325-11ce-bfc1-08002be10318}'
+        Get-ChildItem $pciBase -EA SilentlyContinue | ForEach-Object {
+          Get-ChildItem $_.PSPath -EA SilentlyContinue | ForEach-Object {
+            $props = Get-ItemProperty -Path $_.PSPath -EA SilentlyContinue
+            $cg = $props.ClassGUID
+            if ($cg -eq $dispGuid -or ($cg -eq $netGuid -and $props.Service -notmatch 'iwifi|netathr|bcmwl|Netwtw|IntelWifi|rt[l6]8|rtswlan')) {
+              $affPath = "$($_.PSPath)\\Device Parameters\\Interrupt Management\\Affinity Policy"
+              Remove-ItemProperty -Path $affPath -Name DevicePolicy         -EA SilentlyContinue
+              Remove-ItemProperty -Path $affPath -Name AssignmentSetOverride -EA SilentlyContinue
+            }
+          }
+        }
+      `)
+
+      // ── 5. Remove rogue HID class filter drivers (left by third-party tools) ──
+      s('Checking HID class filter drivers…', 'info')
+      await ps(`
+        $hidClass = 'HKLM:\\SYSTEM\\CurrentControlSet\\Control\\Class\\{745a17a0-74d3-11d0-b6fe-00a0c90f57da}'
+        $props = Get-ItemProperty -Path $hidClass -EA SilentlyContinue
+        if ($props.UpperFilters) { Remove-ItemProperty -Path $hidClass -Name UpperFilters -EA SilentlyContinue }
+        if ($props.LowerFilters) { Remove-ItemProperty -Path $hidClass -Name LowerFilters -EA SilentlyContinue }
+      `)
+
+      // ── 6. Disable LGHUB updater service + kill ALL lghub processes (phantom keyboard source) ──
+      s('Checking for Logitech G HUB phantom driver…', 'info')
+      await ps(`
+        $svc = Get-Service -Name LGHUBUpdaterService -EA SilentlyContinue
+        if ($svc -and $svc.StartType -ne 'Disabled') {
+          Stop-Service  -Name LGHUBUpdaterService -Force -EA SilentlyContinue
+          Set-Service   -Name LGHUBUpdaterService -StartupType Disabled -EA SilentlyContinue
+          Write-Output "LGHUB_DISABLED"
+        }
+        # Kill main lghub.exe too — it's what registers the VID_046D&PID_C232 phantom keyboard
+        Get-Process -Name lghub,lghub_system_tray,lghub_updater,lghub_agent -EA SilentlyContinue | Stop-Process -Force -EA SilentlyContinue
+        Remove-ItemProperty -Path 'HKCU:\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Run' -Name 'LGHUB' -EA SilentlyContinue
+      `)
+
+      // ── 6b. Remove LGHUB HID registry entries (survive process kills, cause re-registration on monitor wake) ──
+      s('Removing LGHUB phantom device registry entries…', 'info')
+      await ps(`
+        # Remove phantom VID_046D&PID_C232 entries from HID enum (re-registration source on USB re-enumeration)
+        Get-ChildItem 'HKLM:\\SYSTEM\\CurrentControlSet\\Enum\\HID' -EA SilentlyContinue | ForEach-Object {
+          if ($_.PSChildName -match 'VID_046D&PID_C232') {
+            Remove-Item -Path $_.PSPath -Recurse -Force -EA SilentlyContinue
+            Write-Output "REMOVED_HID:$($_.PSChildName)"
+          }
+        }
+        # Also sweep ROOT\\HIDCLASS for any LGHUB virtual device entries
+        Get-ChildItem 'HKLM:\\SYSTEM\\CurrentControlSet\\Enum\\ROOT\\HIDCLASS' -EA SilentlyContinue | ForEach-Object {
+          $hw = (Get-ItemProperty -Path $_.PSPath -EA SilentlyContinue).HardwareID
+          if ($hw -and ($hw -match 'LGHUB' -or $hw -match 'VID_046D.*PID_C232')) {
+            Remove-Item -Path $_.PSPath -Recurse -Force -EA SilentlyContinue
+            Write-Output "REMOVED_ROOT:$($_.PSChildName)"
+          }
+        }
+      `)
+
+      // ── 6c. Register a scheduled task to re-run LGHUB cleanup on every boot/wake ──
+      s('Registering boot-time phantom cleanup task…', 'info')
+      await ps(`
+        $script = @'
+Get-Process -Name lghub,lghub_system_tray,lghub_updater,lghub_agent -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
+Get-ChildItem 'HKLM:\\SYSTEM\\CurrentControlSet\\Enum\\HID' -ErrorAction SilentlyContinue | Where-Object { $_.PSChildName -match 'VID_046D&PID_C232' } | Remove-Item -Recurse -Force -ErrorAction SilentlyContinue
+'@
+        $encodedCmd = [Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes($script))
+        $action  = New-ScheduledTaskAction -Execute 'powershell.exe' -Argument "-NonInteractive -WindowStyle Hidden -ExecutionPolicy Bypass -EncodedCommand $encodedCmd"
+        $trigger = New-ScheduledTaskTrigger -AtStartup
+        $settings = New-ScheduledTaskSettingsSet -ExecutionTimeLimit (New-TimeSpan -Minutes 2) -MultipleInstances IgnoreNew
+        $principal = New-ScheduledTaskPrincipal -UserId 'SYSTEM' -RunLevel Highest
+        Register-ScheduledTask -TaskName 'JylliTool_PhantomHIDCleanup' -Action $action -Trigger $trigger -Settings $settings -Principal $principal -Force -EA SilentlyContinue
+        Write-Output "TASK_REGISTERED"
+      `)
+
+      // ── 7. CPU core parking — restore via both GUID and CPMINCORES paths ──────
+      s('Restoring CPU core parking across all power schemes…', 'info')
+      await ps(`
+        $parkGuid  = '0cc5b647-c1df-4637-891a-dec35c318583'
+        $perfBoost = 'be337238-0d82-4146-a960-4f3749d470c7'
+        $subPower  = '54533251-82be-4824-96c1-47b60b740d00'
+        $schemes   = powercfg /list | Select-String 'Power Scheme GUID' | ForEach-Object { ($_ -split ':\\s+')[1].Split(' ')[0] }
+        foreach ($s in $schemes) {
+          powercfg /setacvalueindex  $s $subPower $parkGuid  1   2>$null
+          powercfg /setdcvalueindex  $s $subPower $parkGuid  1   2>$null
+          powercfg /setacvalueindex  $s $subPower $perfBoost 2   2>$null
+          powercfg /setdcvalueindex  $s $subPower $perfBoost 2   2>$null
+        }
+      `)
+      // Also reset CPMINCORES (the human-readable alias some tweaks use)
+      await cmd('powercfg /setacvalueindex SCHEME_CURRENT SUB_PROCESSOR CPMINCORES 0')
+      await cmd('powercfg /setdcvalueindex SCHEME_CURRENT SUB_PROCESSOR CPMINCORES 0')
+
+      // ── 8. Force Windows power engine to re-read — /setactive with real GUID ──
+      if (activeScheme) await runPS(`powercfg /setactive ${activeScheme} 2>$null`).catch(() => {})
+      else await cmd('powercfg /setactive SCHEME_CURRENT')
+
+      s('Done — reboot now for all changes to fully take effect.', 'ok')
+    },
+    restore: async (s, ps) => {
+      await ps(`Unregister-ScheduledTask -TaskName 'JylliTool_PhantomHIDCleanup' -Confirm:$false -EA SilentlyContinue`)
+      s('This fix is a restore — boot cleanup task removed.', 'info')
+    }
+  },
+  'fix-phantom-hid': {
+    apply: async (s, ps) => {
+      s('Scanning for phantom HID/USB devices…', 'info')
+      const result = await ps(`
+Add-Type -TypeDefinition @"
+using System;
+using System.Runtime.InteropServices;
+using System.Collections.Generic;
+using System.Text;
+
+public class DeviceRemover {
+  [DllImport("setupapi.dll", SetLastError=true)]
+  public static extern IntPtr SetupDiGetClassDevs(ref Guid ClassGuid, string Enumerator, IntPtr hwndParent, uint Flags);
+
+  [DllImport("setupapi.dll", SetLastError=true)]
+  public static extern bool SetupDiEnumDeviceInfo(IntPtr DeviceInfoSet, uint MemberIndex, ref SP_DEVINFO_DATA DeviceInfoData);
+
+  [DllImport("setupapi.dll", SetLastError=true)]
+  public static extern bool SetupDiRemoveDevice(IntPtr DeviceInfoSet, ref SP_DEVINFO_DATA DeviceInfoData);
+
+  [DllImport("setupapi.dll", SetLastError=true)]
+  public static extern bool SetupDiDestroyDeviceInfoList(IntPtr DeviceInfoSet);
+
+  [DllImport("setupapi.dll", CharSet=CharSet.Auto, SetLastError=true)]
+  public static extern bool SetupDiGetDeviceInstanceId(IntPtr DeviceInfoSet, ref SP_DEVINFO_DATA DeviceInfoData, StringBuilder DeviceInstanceId, uint DeviceInstanceIdSize, out uint RequiredSize);
+
+  public const uint DIGCF_ALLCLASSES = 0x04;
+
+  [StructLayout(LayoutKind.Sequential)]
+  public struct SP_DEVINFO_DATA {
+    public uint  cbSize;
+    public Guid  ClassGuid;
+    public uint  DevInst;
+    public IntPtr Reserved;
+  }
+
+  public static string[] RemovePhantomDevices(string[] patterns) {
+    var results = new List<string>();
+    Guid g = Guid.Empty;
+    IntPtr devs = SetupDiGetClassDevs(ref g, null, IntPtr.Zero, DIGCF_ALLCLASSES);
+    if (devs == (IntPtr)(-1)) return results.ToArray();
+    var info = new SP_DEVINFO_DATA();
+    info.cbSize = (uint)System.Runtime.InteropServices.Marshal.SizeOf(info);
+    uint i = 0;
+    while (SetupDiEnumDeviceInfo(devs, i++, ref info)) {
+      var sb = new StringBuilder(512);
+      uint sz;
+      if (!SetupDiGetDeviceInstanceId(devs, ref info, sb, 512, out sz)) continue;
+      string id = sb.ToString().ToUpperInvariant();
+      bool match = false;
+      foreach (var p in patterns) { if (id.Contains(p.ToUpperInvariant())) { match = true; break; } }
+      if (match) {
+        bool ok = SetupDiRemoveDevice(devs, ref info);
+        results.Add((ok ? "REMOVED" : "FAIL") + "|" + sb.ToString());
+        i = 0;
+      }
+    }
+    SetupDiDestroyDeviceInfoList(devs);
+    return results.ToArray();
+  }
+}
+"@ -Language CSharp -ErrorAction Stop
+$patterns = @('VID_36A7&PID_A881','VID_045E&PID_0B12','VID_045E&PID_02FF','VID_046D&PID_C232','LGHUBDEVICE')
+$r = [DeviceRemover]::RemovePhantomDevices($patterns)
+if ($r.Count -eq 0) { Write-Output "NONE_FOUND" } else { foreach ($x in $r) { Write-Output $x } }
+      `)
+      const lines = (result.out || '').split(/\r?\n/).filter(Boolean)
+      if (lines.includes('NONE_FOUND') || lines.length === 0) {
+        s('No phantom devices found — system looks clean.', 'ok')
+        return
+      }
+      let removed = 0, failed = 0
+      for (const line of lines) {
+        const sep = line.indexOf('|')
+        const status = sep >= 0 ? line.slice(0, sep) : line
+        const id = sep >= 0 ? line.slice(sep + 1) : line
+        if (status === 'REMOVED') { removed++; s(`  Removed: ${id.split('\\').pop()}`, 'ok') }
+        else { failed++; s(`  Could not remove: ${id.split('\\').pop()}`, 'warn') }
+      }
+      if (removed > 0) s(`Done — removed ${removed} phantom device(s). Reboot to complete.`, 'ok')
+      if (failed > 0) s(`${failed} device(s) could not be removed (may require Safe Mode).`, 'warn')
+    },
+    restore: async (s) => s('Phantom device removal cannot be undone — reinstall the relevant software to restore devices.', 'info')
+  },
 
   // ── New General Tweaks (from screenshots) ─────────────────────────────────
   'raw-aim-curve': {
@@ -3995,28 +4199,6 @@ ${c}
   },
 
   // ── New Advanced Tweaks (from screenshots) ───────────────────────────────
-  'apex-power-plan': {
-    apply: async (s, _, cmd) => {
-      // Duplicate Ultimate Performance plan and apply extreme settings
-      const r = await cmd('powercfg -duplicatescheme e9a42b02-d5df-448d-aa00-03f14749eb61')
-      const m = r.out.match(/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})/i)
-      if (!m) { s('Could not create power plan.', 'warn'); return }
-      const guid = m[1]
-      await cmd(`powercfg -setactive ${guid}`)
-      await cmd(`powercfg /setacvalueindex ${guid} SUB_PROCESSOR CPMINCORES 100`)
-      await cmd(`powercfg /setacvalueindex ${guid} SUB_PROCESSOR PROCTHROTTLEMIN 100`)
-      await cmd(`powercfg /setacvalueindex ${guid} SUB_PROCESSOR PROCTHROTTLEMAX 100`)
-      await cmd(`powercfg /setacvalueindex ${guid} SUB_PROCESSOR IDLEPROMOTE 0`)
-      await cmd(`powercfg /setacvalueindex ${guid} 501a4d13-42af-4429-9ac1-df54c6bf3fc2 ee12f906-d277-404b-b6da-e5fa1a576df5 0`)
-      await cmd(`powercfg /setacvalueindex ${guid} 2a737441-1930-4402-8d77-b2bebba308a3 48e6b7a6-50f5-4782-a5d4-53bb8f07e226 0`)
-      await cmd(`powercfg -setactive ${guid}`)
-      s(`Apex Power Plan activated (${guid}) — maximum CPU, PCIe and USB performance. Reboot recommended.`, 'ok')
-    },
-    restore: async (s, _, cmd) => {
-      await cmd('powercfg -setactive 381b4222-f694-41f0-9685-ff5bb260df2e')
-      s('Balanced power plan restored.', 'ok')
-    }
-  },
   'gpu-hags-off': {
     apply: async (s, ps) => {
       await ps('Set-ItemProperty -Path "HKLM:\\SYSTEM\\CurrentControlSet\\Control\\GraphicsDrivers" -Name HwSchMode -Value 1 -Force')
@@ -4306,7 +4488,6 @@ ipcMain.handle('run-windows-health', async () => {
 
   send(results.ok ? '✓ Windows Health check complete — no issues found' : `⚠ Health check complete — ${results.issues.length} issue(s) found`, results.ok ? 'ok' : 'warn', 100)
   clearDiscordOverride()
-  webhookHealthCheck(results)
   return results
 })
 
@@ -4745,6 +4926,17 @@ ipcMain.handle('install-update', () => {
 
 // What's New content
 const WHATS_NEW = [
+  { version: '1.3.5', date: 'May 2026', items: [
+    'Fix Mouse ghosting — now covers 7 root causes including MMCSS=0, HID class filter drivers, CPU core parking via both registry paths (GUID + CPMINCORES), and forces Windows power engine to re-read settings immediately via /setactive with real scheme GUID',
+    'Boot-time ghosting fix — the fix now works even when Pulse was never used, catching issues left by other optimizer tools',
+    'Pulse deactivate — core parking restore now also calls /setactive to immediately apply, not just write the values',
+  ]},
+  { version: '1.3.4', date: 'May 2026', items: [
+    'Pulse is now its own sidebar tab under Tools — activate and manage Pulse without leaving the game profiles view',
+    'Advanced Mode toggle — new button in the top bar hides less-used tabs (Processes, Latency, Ping Test) by default; click once to reveal them',
+    'Text readability — descriptions, subtitles, and log lines are now significantly brighter and easier to read on dark backgrounds',
+    'Discord Rich Presence — Pulse state now shows elapsed active time (e.g. "FiveM · Active 4m 32s") and a cleaner "⚡ Pulse Active" small icon',
+  ]},
   { version: '1.3.3', date: 'May 2026', items: [
     'Arma Reforger Graphics Settings — dedicated window to edit platform.json directly, with system-tier-aware recommended settings, Quality/Performance presets, and instant save',
     'Tweak Profiles — save your current applied tweaks as a named profile and load them with one click (Gaming Mode, Work Mode, etc.)',
@@ -5031,16 +5223,6 @@ ipcMain.handle('apply-game-tweak', async (_, { gameId, action }) => {
 })
 
 // Clean temp files
-ipcMain.handle('clean-system', async (_, paths) => {
-  const send = (msg, level) => mainWindow?.webContents.send('log', { msg, level, ts: new Date().toLocaleTimeString() })
-  for (const p of paths) {
-    const r = await runPS(`Remove-Item -Path '${p}\\*' -Recurse -Force -ErrorAction SilentlyContinue; (Get-ChildItem '${p}' -EA SilentlyContinue).Count`)
-    send(`  ${path.basename(p)}: cleared`, 'ok')
-  }
-  send('Cleanup complete.', 'ok')
-  return { ok: true }
-})
-
 // ─── Process Manager ──────────────────────────────────────────────────────────
 ipcMain.handle('get-processes', async () => {
   const r = await runPS(`
@@ -5212,106 +5394,124 @@ ipcMain.handle('close-arma-settings', () => {
   armaSettingsWindow = null
 })
 
-function findArmaSettings(manualPath) {
-  if (manualPath && fs.existsSync(manualPath)) return manualPath
-  const appdata = process.env.APPDATA || ''
-  const candidates = [
-    path.join(appdata, 'ArmaReforger', 'platform.json'),
-    path.join(appdata, 'Bohemia Interactive', 'ArmaReforger', 'platform.json'),
-  ]
-  return candidates.find(p => fs.existsSync(p)) || null
+// ── Arma Reforger .conf parser/writer ────────────────────────────────────────
+// Flat key extraction: scans lines for "  Key Value\n" patterns.
+// We don't need a full recursive parser — just find the first occurrence of each key.
+function armaConfGet(raw, key) {
+  const re = new RegExp(`^\\s+${key}\\s+(.+)$`, 'm')
+  const m = raw.match(re)
+  if (!m) return null
+  return m[1].trim().replace(/^"|"$/g, '') // strip quotes if present
 }
 
-ipcMain.handle('arma-read-settings', async (_, manualPath) => {
-  const settingsPath = findArmaSettings(manualPath)
-  if (!settingsPath) {
+function armaConfSet(raw, key, value) {
+  // Replace the first occurrence of "  Key OldValue" with "  Key NewValue"
+  // Handles quoted and unquoted values, preserving indentation
+  const re = new RegExp(`(^\\s+${key}\\s+)(.+)$`, 'm')
+  if (re.test(raw)) {
+    return raw.replace(re, (_, prefix, _old) => `${prefix}${value}`)
+  }
+  // Key doesn't exist — can't insert safely, return unchanged
+  return raw
+}
+
+function findArmaSettingsDir(manualDir) {
+  if (manualDir && fs.existsSync(manualDir)) return manualDir
+  const docs = path.join(os.homedir(), 'Documents', 'My Games', 'ArmaReforger', 'profile', '.save')
+  if (!fs.existsSync(docs)) return null
+  // Find any app1874880_user* folder
+  try {
+    const entries = fs.readdirSync(docs)
+    for (const e of entries) {
+      if (e.startsWith('app1874880_user')) {
+        const settingsDir = path.join(docs, e, 'settings')
+        if (fs.existsSync(settingsDir)) return settingsDir
+      }
+    }
+  } catch (_) {}
+  return null
+}
+
+// Map from our flat key → { file: 'engine'|'game', confKey: 'ExactKeyName' }
+const ARMA_KEY_MAP = {
+  windowMode:          { file: 'engine', confKey: 'WindowMode' },
+  vsync:               { file: 'engine', confKey: 'Vsync' },
+  fsaa:                { file: 'engine', confKey: 'Fsaa' },
+  resolutionScale:     { file: 'engine', confKey: 'ResolutionScale' },
+  fsrEnabled:          { file: 'engine', confKey: 'FsrEnabled' },
+  environmentQuality:  { file: 'engine', confKey: 'EnvironmentQuality' },
+  objectDrawDistance:  { file: 'engine', confKey: 'ObjectDrawDistanceScale' },
+  grassDistance:       { file: 'engine', confKey: 'Distance' },
+  grassLod:            { file: 'engine', confKey: 'Lod' },
+  textureDetail:       { file: 'engine', confKey: 'TextureDetail' },
+  textureFilter:       { file: 'engine', confKey: 'TextureFilter' },
+  geometricDetail:     { file: 'engine', confKey: 'GeometricDetail' },
+  hbao:                { file: 'engine', confKey: 'HBAO' },
+  ssdo:                { file: 'engine', confKey: 'SSDO' },
+  ssr:                 { file: 'engine', confKey: 'SSR' },
+  ppaa:                { file: 'engine', confKey: 'PPAA' },
+  viewDistance:        { file: 'game',   confKey: 'm_iViewDistance' },
+  mouseSensitivity:    { file: 'game',   confKey: 'm_fMouseSensitivity' },
+  dofType:             { file: 'game',   confKey: 'm_iDofType' },
+}
+
+ipcMain.handle('arma-read-settings', async (_, manualDir) => {
+  const settingsDir = findArmaSettingsDir(manualDir)
+  if (!settingsDir) {
     return {
       ok: false,
-      reason: 'platform.json not found in %APPDATA%\\ArmaReforger\\',
-      hint: 'Launch Arma Reforger, go to Settings → Graphics, change any option and quit the game. The file will be created automatically.'
+      reason: 'Arma Reforger settings folder not found.',
+      hint: 'Expected: Documents\\My Games\\ArmaReforger\\profile\\.save\\app1874880_user...\\settings\\'
     }
   }
-  let raw
-  try { raw = fs.readFileSync(settingsPath, 'utf8') } catch (e) {
-    return { ok: false, reason: `Could not read ${settingsPath}: ${e.message}` }
-  }
-  let json
-  try { json = JSON.parse(raw) } catch (e) {
-    return { ok: false, reason: `platform.json is not valid JSON: ${e.message}` }
-  }
-
-  // Read dot-notation keys from nested JSON
-  function getNestedVal(obj, dotKey) {
-    const parts = dotKey.split('.')
-    let cur = obj
-    for (const p of parts) {
-      if (cur == null || typeof cur !== 'object') return null
-      cur = cur[p]
-    }
-    return cur != null ? String(cur) : null
-  }
-
-  const ARMA_KEYS = [
-    'renderer.renderResolutionScaleMultiplier','renderer.objectLOD','renderer.terrainQuality',
-    'renderer.shadowQuality','renderer.shadowDistance','renderer.shadowCascades',
-    'renderer.textureQuality','renderer.textureStreamingQuality','renderer.anisotropy',
-    'renderer.ambientOcclusion','renderer.bloomQuality','renderer.motionBlur',
-    'renderer.depthOfField','renderer.cloudsQuality','renderer.vegetationQuality',
-    'renderer.antiAliasing','renderer.windowMode','renderer.vsync',
-  ]
+  const engineFile = path.join(settingsDir, 'ReforgerEngineSettings.conf')
+  const gameFile   = path.join(settingsDir, 'ReforgerGameSettings.conf')
+  let engineRaw = '', gameRaw = ''
+  try { engineRaw = fs.readFileSync(engineFile, 'utf8') } catch (_) {}
+  try { gameRaw   = fs.readFileSync(gameFile,   'utf8') } catch (_) {}
 
   const vals = {}
-  for (const k of ARMA_KEYS) vals[k] = getNestedVal(json, k)
+  for (const [key, { file, confKey }] of Object.entries(ARMA_KEY_MAP)) {
+    const raw = file === 'engine' ? engineRaw : gameRaw
+    vals[key] = armaConfGet(raw, confKey)
+  }
 
-  return { ok: true, vals, path: settingsPath }
+  return { ok: true, vals, path: settingsDir }
 })
 
-ipcMain.handle('arma-write-settings', async (_, changes, manualPath) => {
-  const settingsPath = findArmaSettings(manualPath)
-  if (!settingsPath) return { ok: false, reason: 'platform.json not found — cannot save.' }
-  let raw
-  try { raw = fs.readFileSync(settingsPath, 'utf8') } catch (e) {
-    return { ok: false, reason: `Could not read file: ${e.message}` }
-  }
-  let json
-  try { json = JSON.parse(raw) } catch (e) {
-    return { ok: false, reason: `File is not valid JSON: ${e.message}` }
-  }
+ipcMain.handle('arma-write-settings', async (_, changes, manualDir) => {
+  const settingsDir = findArmaSettingsDir(manualDir)
+  if (!settingsDir) return { ok: false, reason: 'Settings folder not found — cannot save.' }
 
-  // Backup
-  try { fs.writeFileSync(settingsPath + '.bak', raw, 'utf8') } catch (_) {}
-
-  // Write dot-notation keys into nested JSON
-  function setNestedVal(obj, dotKey, val) {
-    const parts = dotKey.split('.')
-    let cur = obj
-    for (let i = 0; i < parts.length - 1; i++) {
-      if (cur[parts[i]] == null || typeof cur[parts[i]] !== 'object') cur[parts[i]] = {}
-      cur = cur[parts[i]]
-    }
-    const last = parts[parts.length - 1]
-    // Coerce type: if original was number, keep number; boolean string → boolean
-    const orig = cur[last]
-    if (typeof orig === 'number') cur[last] = parseFloat(val)
-    else if (typeof orig === 'boolean') cur[last] = val === 'true' || val === '1'
-    else if (orig == null) {
-      // Try numeric, else string
-      const n = parseFloat(val)
-      cur[last] = isNaN(n) ? val : n
-    } else cur[last] = val
+  const engineFile = path.join(settingsDir, 'ReforgerEngineSettings.conf')
+  const gameFile   = path.join(settingsDir, 'ReforgerGameSettings.conf')
+  let engineRaw, gameRaw
+  try { engineRaw = fs.readFileSync(engineFile, 'utf8') } catch (e) {
+    return { ok: false, reason: `Could not read ReforgerEngineSettings.conf: ${e.message}` }
+  }
+  try { gameRaw = fs.readFileSync(gameFile, 'utf8') } catch (e) {
+    return { ok: false, reason: `Could not read ReforgerGameSettings.conf: ${e.message}` }
   }
 
-  for (const [key, val] of Object.entries(changes)) {
-    setNestedVal(json, key, val)
+  // Backup both files
+  try { fs.writeFileSync(engineFile + '.bak', engineRaw, 'utf8') } catch (_) {}
+  try { fs.writeFileSync(gameFile   + '.bak', gameRaw,   'utf8') } catch (_) {}
+
+  for (const [key, value] of Object.entries(changes)) {
+    const mapping = ARMA_KEY_MAP[key]
+    if (!mapping) continue
+    if (mapping.file === 'engine') engineRaw = armaConfSet(engineRaw, mapping.confKey, value)
+    else                            gameRaw   = armaConfSet(gameRaw,   mapping.confKey, value)
   }
 
-  try {
-    fs.writeFileSync(settingsPath, JSON.stringify(json, null, 2), 'utf8')
-  } catch (e) {
-    return { ok: false, reason: `Could not write file: ${e.message}` }
+  try { fs.writeFileSync(engineFile, engineRaw, 'utf8') } catch (e) {
+    return { ok: false, reason: `Could not write ReforgerEngineSettings.conf: ${e.message}` }
+  }
+  try { fs.writeFileSync(gameFile, gameRaw, 'utf8') } catch (e) {
+    return { ok: false, reason: `Could not write ReforgerGameSettings.conf: ${e.message}` }
   }
 
-  return { ok: true, path: settingsPath, changed: Object.keys(changes).length }
+  return { ok: true }
 })
 
 // ─── Pulse ────────────────────────────────────────────────────────────────────
@@ -5337,9 +5537,48 @@ let pulseOrigMmcssResponsiveness = null
 let pulseOrigPowerPlan = null
 let autoPulseTriggeredPreset = null  // set when game watcher auto-activated pulse
 let lastUsedPulsePreset = null       // remembered for tray "Start Pulse" shortcut
+let pulseStartTimestamp = null       // set when Pulse activates, cleared on restore
 
 
 async function pulseRestoreAll(send) {
+  // Restore interrupt affinity — remove DevicePolicy + AssignmentSetOverride so Windows
+  // resumes automatic interrupt routing (must run first, before reboot clears handles)
+  await runPS(`
+    $pciBase  = 'HKLM:\\SYSTEM\\CurrentControlSet\\Enum\\PCI'
+    $netGuid  = '{4d36e972-e325-11ce-bfc1-08002be10318}'
+    $dispGuid = '{4d36e968-e325-11ce-bfc1-08002be10318}'
+    Get-ChildItem $pciBase -EA SilentlyContinue | ForEach-Object {
+      Get-ChildItem $_.PSPath -EA SilentlyContinue | ForEach-Object {
+        $props = Get-ItemProperty -Path $_.PSPath -EA SilentlyContinue
+        $cg = $props.ClassGUID
+        if ($cg -eq $dispGuid -or ($cg -eq $netGuid -and $props.Service -notmatch 'iwifi|netathr|bcmwl|Netwtw|IntelWifi|rt[l6]8|rtswlan')) {
+          $affPath = "$($_.PSPath)\\Device Parameters\\Interrupt Management\\Affinity Policy"
+          Remove-ItemProperty -Path $affPath -Name DevicePolicy           -EA SilentlyContinue
+          Remove-ItemProperty -Path $affPath -Name AssignmentSetOverride   -EA SilentlyContinue
+        }
+      }
+    }
+  `, 20000).catch(() => {})
+  send('  Interrupt affinity restored to Windows defaults.', 'ok')
+
+  // Re-enable CPU core parking — powercfg writes persist across reboots and must be explicitly reversed
+  await runPS(`
+    $parkGuid  = '0cc5b647-c1df-4637-891a-dec35c318583'
+    $perfBoost = 'be337238-0d82-4146-a960-4f3749d470c7'
+    $subPower  = '54533251-82be-4824-96c1-47b60b740d00'
+    $active    = (powercfg /getactivescheme) -replace '.*GUID:\\s+(\\S+).*','$1'
+    $schemes   = powercfg /list | Select-String 'Power Scheme GUID' | ForEach-Object { ($_ -split ':\\s+')[1].Split(' ')[0] }
+    foreach ($s in $schemes) {
+      powercfg /setacvalueindex  $s $subPower $parkGuid  1   2>$null
+      powercfg /setdcvalueindex  $s $subPower $parkGuid  1   2>$null
+      powercfg /setacvalueindex  $s $subPower $perfBoost 2   2>$null
+      powercfg /setdcvalueindex  $s $subPower $perfBoost 2   2>$null
+    }
+    powercfg /setactive $active 2>$null
+    Write-Output "PARK_OK"
+  `, 20000).catch(() => {})
+  send('  CPU core parking restored.', 'ok')
+
   // Restore timer resolution — just release our request; Windows reverts automatically
   await runPS(`
     try {
@@ -5398,6 +5637,7 @@ public class ProcPrio {
     } | ForEach-Object { try { $_.PriorityClass = 'Normal' } catch {} }
   `, 15000)
 
+  pulseStartTimestamp = null
   send('◆ Pulse deactivated — all settings restored.', 'ok')
 }
 
@@ -5409,6 +5649,7 @@ async function activatePulse(presetId, killBg, send) {
   send(`◆ Pulse activating — ${preset.name}`, 'head')
   pulseActivePreset = presetId
   lastUsedPulsePreset = presetId
+  pulseStartTimestamp = Date.now()
 
   // ── 1. Timer resolution: request 0.5ms via NtSetTimerResolution ──────────────
   // 5000 = 0.5ms in 100ns units. Falls back silently if ntdll isn't available.
@@ -5468,12 +5709,13 @@ public class TimerRes { [DllImport("ntdll.dll")] public static extern int NtSetT
   send('  MMCSS Games scheduling → High (SystemResponsiveness=10)', 'ok')
 
   // ── 5. Interrupt affinity — move GPU + top NIC DPCs off CPU 0 ────────────────
-  // CPU 0 is the default Windows interrupt target; moving heavy devices to CPU 2
-  // frees it for the game's main thread and OS scheduler.
+  // Only run on ≥ 6 core systems — on low core counts, routing to a specific CPU
+  // can starve USB HID (mouse/keyboard) interrupt scheduling.
+  // Uses CPU 3 (not 2) to stay further from CPU 0 (OS scheduler) and CPU 1 (game thread).
   const coreCount = os.cpus().length
-  if (coreCount >= 4) {
+  if (coreCount >= 6) {
     await runPS(`
-      $targetCpu = 2  # CPU 2 — leave 0 for OS scheduler, 1 for game main thread
+      $targetCpu = 3  # CPU 3 — away from OS scheduler (0), game thread (1), and HID (2)
       $mask = [uint32](1 -shl $targetCpu)
       $pciBase = 'HKLM:\\SYSTEM\\CurrentControlSet\\Enum\\PCI'
       $netGuid = '{4d36e972-e325-11ce-bfc1-08002be10318}'
@@ -5498,8 +5740,10 @@ public class TimerRes { [DllImport("ntdll.dll")] public static extern int NtSetT
       Write-Output "AFFINITY_OK:$moved"
     `, 20000).then(r => {
       const m = r.out.match(/AFFINITY_OK:(\d+)/)
-      if (m) send(`  Interrupt affinity routed for ${m[1]} device(s) → CPU 2`, 'ok')
+      if (m) send(`  Interrupt affinity routed for ${m[1]} device(s) → CPU 3`, 'ok')
     })
+  } else {
+    send(`  Interrupt affinity skipped (${coreCount} cores — HID safety)`, 'info')
   }
 
   // ── 6. Kill background processes ─────────────────────────────────────────────
@@ -5538,8 +5782,8 @@ public class ProcPrio {
 '@ -EA SilentlyContinue
       try {
         $handle = $dwm.Handle
-        $ioPrio = 1   # IO_PRIORITY_HINT: 1 = VeryLow
-        $pgPrio = 1   # MEMORY_PRIORITY: 1 = VeryLow
+        $ioPrio = 2   # IO_PRIORITY_HINT: 2 = Low (safe minimum — VeryLow starves desktop rendering)
+        $pgPrio = 3   # MEMORY_PRIORITY: 3 = Below Normal (reduced without breaking DWM)
         [ProcPrio]::NtSetInformationProcess($handle, 21, [ref]$ioPrio, 4) | Out-Null  # ProcessIoPriority
         [ProcPrio]::NtSetInformationProcess($handle, 33, [ref]$pgPrio, 4) | Out-Null  # ProcessPagePriority
         Write-Output "DWM_OK"
@@ -5563,17 +5807,6 @@ public class ProcPrio {
   send(`◆ Pulse active — ${preset.name}`, 'head')
   discordPulseGame = preset.name
   updateDiscordPresence()
-  sessionPulseUses++
-  webhookPulseActivated(preset.name, [
-    'Timer resolution → 0.5ms (NtSetTimerResolution)',
-    'CPU core parking disabled',
-    'Power plan → High Performance',
-    'MMCSS Games scheduling → High (SystemResponsiveness=10)',
-    `Interrupt affinity routed → CPU 2 (${os.cpus().length >= 4 ? 'applied' : 'skipped — <4 cores'})`,
-    'DWM I/O + page priority lowered',
-    `Game priority → ${preset.priority} (${preset.name})`,
-    killBg ? `Background apps killed (${preset.killList.join(', ')})` : 'Background kill: skipped',
-  ])
   mainWindow?.webContents.send('pulse-tick', { preset: presetId, active: true })
   updateTrayMenu()
   return { ok: true }
@@ -5598,6 +5831,40 @@ ipcMain.handle('pulse-stop', async () => {
   const send = (msg, level) => mainWindow?.webContents.send('log', { msg, level, ts: new Date().toLocaleTimeString() })
   autoPulseTriggeredPreset = null  // clear auto-pulse state on manual stop too
   return deactivatePulse(send)
+})
+
+ipcMain.handle('pulse-fix-mouse', async () => {
+  // Clear interrupt affinity overrides
+  await runPS(`
+    $pciBase  = 'HKLM:\\SYSTEM\\CurrentControlSet\\Enum\\PCI'
+    $netGuid  = '{4d36e972-e325-11ce-bfc1-08002be10318}'
+    $dispGuid = '{4d36e968-e325-11ce-bfc1-08002be10318}'
+    Get-ChildItem $pciBase -EA SilentlyContinue | ForEach-Object {
+      Get-ChildItem $_.PSPath -EA SilentlyContinue | ForEach-Object {
+        $props = Get-ItemProperty -Path $_.PSPath -EA SilentlyContinue
+        $cg = $props.ClassGUID
+        if ($cg -eq $dispGuid -or ($cg -eq $netGuid -and $props.Service -notmatch 'iwifi|netathr|bcmwl|Netwtw|IntelWifi|rt[l6]8|rtswlan')) {
+          $affPath = "$($_.PSPath)\\Device Parameters\\Interrupt Management\\Affinity Policy"
+          Remove-ItemProperty -Path $affPath -Name DevicePolicy           -EA SilentlyContinue
+          Remove-ItemProperty -Path $affPath -Name AssignmentSetOverride   -EA SilentlyContinue
+        }
+      }
+    }
+  `, 20000).catch(() => {})
+  // Re-enable CPU core parking (persists across reboots — must explicitly reverse)
+  await runPS(`
+    $parkGuid  = '0cc5b647-c1df-4637-891a-dec35c318583'
+    $perfBoost = 'be337238-0d82-4146-a960-4f3749d470c7'
+    $subPower  = '54533251-82be-4824-96c1-47b60b740d00'
+    $schemes = powercfg /list | Select-String 'Power Scheme GUID' | ForEach-Object { ($_ -split ':\\s+')[1].Split(' ')[0] }
+    foreach ($s in $schemes) {
+      powercfg /setacvalueindex  $s $subPower $parkGuid  1   2>$null
+      powercfg /setdcvalueindex  $s $subPower $parkGuid  1   2>$null
+      powercfg /setacvalueindex  $s $subPower $perfBoost 0   2>$null
+    }
+    powercfg /update-settings 2>$null
+  `, 20000).catch(() => {})
+  return { ok: true }
 })
 
 ipcMain.handle('pulse-get-presets', () => {
@@ -5925,6 +6192,13 @@ ipcMain.handle('start-game-watcher', async () => {
         const send = (msg, level) => mainWindow?.webContents.send('log', { msg, level, ts: new Date().toLocaleTimeString() })
         send(`◆ Auto-Pulse: activating for ${presetName}…`, 'head')
         mainWindow?.webContents.send('game-watcher-event', { event: 'auto-pulse-start', gameId: detectedGame, presetId: detectedGame })
+        if (Notification.isSupported()) {
+          new Notification({
+            title: 'Pulse Activated',
+            body: `${presetName} detected — Pulse is now active`,
+            icon: path.join(__dirname, 'icon.png')
+          }).show()
+        }
         activatePulse(detectedGame, false, send).catch(() => { autoPulseTriggeredPreset = null })
       }
 
@@ -5946,9 +6220,17 @@ ipcMain.handle('start-game-watcher', async () => {
       // Auto-Pulse: deactivate if it was auto-triggered
       if (autoPulseTriggeredPreset) {
         const send = (msg, level) => mainWindow?.webContents.send('log', { msg, level, ts: new Date().toLocaleTimeString() })
+        const prevPreset = PULSE_PRESETS[autoPulseTriggeredPreset]
         send(`◆ Auto-Pulse: deactivating (${prev} closed)`, 'info')
         autoPulseTriggeredPreset = null
         mainWindow?.webContents.send('game-watcher-event', { event: 'auto-pulse-stop', gameId: prev })
+        if (Notification.isSupported() && prevPreset) {
+          new Notification({
+            title: 'Pulse Restored',
+            body: `${prevPreset.name} closed — system settings restored`,
+            icon: path.join(__dirname, 'icon.png')
+          }).show()
+        }
         deactivatePulse(send).catch(() => {})
       }
     }
@@ -5975,7 +6257,7 @@ ipcMain.handle('stop-game-watcher', async () => {
 ipcMain.handle('get-game-watcher-status', () => ({ running: !!gameWatcherInterval, activeGame: activeGameProfile }))
 
 // ─── Tweak Changelog ──────────────────────────────────────────────────────────
-const CHANGELOG_PATH = path.join(app.getPath('userData'), 'jt_changelog.json')
+let CHANGELOG_PATH = null
 
 function loadChangelog() {
   try { if (fs.existsSync(CHANGELOG_PATH)) return JSON.parse(fs.readFileSync(CHANGELOG_PATH, 'utf8')) } catch {}

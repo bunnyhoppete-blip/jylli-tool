@@ -29,7 +29,6 @@ contextBridge.exposeInMainWorld('api', {
   fivemScanMods:      ()           => ipcRenderer.invoke('fivem-scan-mods'),
   fivemReadSettings:  (manualPath) => ipcRenderer.invoke('fivem-read-settings', manualPath),
   fivemWriteSettings: (changes, manualPath) => ipcRenderer.invoke('fivem-write-settings', changes, manualPath),
-  cleanSystem:        (paths)      => ipcRenderer.invoke('clean-system', paths),
   runAutoOpti:        (si)         => ipcRenderer.invoke('run-auto-opti', si),
   applyGameTweak:     (id, action) => ipcRenderer.invoke('apply-game-tweak', { gameId: id, action }),
   getProcesses:       ()           => ipcRenderer.invoke('get-processes'),
@@ -48,6 +47,7 @@ contextBridge.exposeInMainWorld('api', {
   analyticsTweakApplied: ()          => ipcRenderer.invoke('analytics-tweak-applied'),
   pulseStart:         (opts)       => ipcRenderer.invoke('pulse-start', opts),
   pulseStop:          ()           => ipcRenderer.invoke('pulse-stop'),
+  pulseFixMouse:      ()           => ipcRenderer.invoke('pulse-fix-mouse'),
   pulseGetPresets:    ()           => ipcRenderer.invoke('pulse-get-presets'),
   pulseDetectGame:    ()           => ipcRenderer.invoke('pulse-detect-game'),
   onPulseTick:        (cb)         => ipcRenderer.on('pulse-tick', (_, d) => cb(d)),
@@ -95,5 +95,6 @@ contextBridge.exposeInMainWorld('api', {
   runFix:             (id)         => ipcRenderer.invoke('run-fix', id),
   runWindowsHealth:   ()           => ipcRenderer.invoke('run-windows-health'),
   runPreflightScan:   ()           => ipcRenderer.invoke('run-preflight-scan'),
+  checkLghub:         ()           => ipcRenderer.invoke('check-lghub'),
   onTrayPulseChanged: (cb)         => ipcRenderer.on('tray-pulse-changed', (_, d) => cb(d)),
 })

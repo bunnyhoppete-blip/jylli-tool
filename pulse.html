@@ -159,13 +159,37 @@ html, body {
 .opt-sub { font-size: 9.5px; color: #444; margin-top: 1px; }
 
 /* ── Live monitor ── */
-.metric-row { margin-bottom: 8px; }
+.monitor-header {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-bottom: 0;
+}
+.monitor-toggle {
+  background: none; border: none; color: #444; cursor: pointer;
+  padding: 2px 4px; font-size: 10px; border-radius: 4px;
+  transition: color 0.15s;
+  -webkit-app-region: no-drag;
+}
+.monitor-toggle:hover { color: #888; }
+.monitor-body {
+  overflow: hidden;
+  transition: max-height 0.25s ease, opacity 0.2s ease, margin-top 0.2s ease;
+  max-height: 0;
+  opacity: 0;
+  margin-top: 0;
+}
+.monitor-body.open {
+  max-height: 300px;
+  opacity: 1;
+  margin-top: 10px;
+}
+.metric-row { margin-bottom: 7px; }
 .metric-row:last-child { margin-bottom: 0; }
-.metric-head { display: flex; justify-content: space-between; margin-bottom: 3px; }
+.metric-head { display: flex; justify-content: space-between; margin-bottom: 3px; align-items: baseline; }
 .metric-label { font-size: 10px; color: #555; font-weight: 600; letter-spacing: 0.05em; }
 .metric-val { font-size: 10px; color: #888; font-weight: 600; }
+.metric-sub { font-size: 9px; color: #383838; margin-left: 6px; }
 .metric-track {
-  height: 4px;
+  height: 3px;
   background: rgba(255,255,255,0.05);
   border-radius: 2px;
   overflow: hidden;
@@ -175,6 +199,15 @@ html, body {
   border-radius: 2px;
   transition: width 0.5s ease;
   width: 0%;
+}
+.metric-net {
+  display: flex; justify-content: space-between;
+  font-size: 9.5px; color: #444; margin-top: 1px;
+}
+#monitor-spark {
+  display: block; width: 100%; height: 36px;
+  margin-top: 10px; border-radius: 4px;
+  opacity: 0.8;
 }
 
 /* ── Buttons ── */
@@ -283,18 +316,41 @@ html, body {
 
     <!-- Live Monitor -->
     <div class="card">
-      <div class="card-label">LIVE MONITOR</div>
-      <div class="metric-row">
-        <div class="metric-head"><span class="metric-label">CPU</span><span class="metric-val" id="cpu-val">—</span></div>
-        <div class="metric-track"><div class="metric-fill" id="cpu-bar" style="background:var(--pink)"></div></div>
+      <div class="monitor-header">
+        <div class="card-label" style="margin-bottom:0">LIVE MONITOR</div>
+        <button class="monitor-toggle" id="monitor-toggle-btn" onclick="toggleMonitor()" title="Toggle live monitor">
+          <i class="fa fa-chevron-down" id="monitor-chevron"></i>
+        </button>
       </div>
-      <div class="metric-row">
-        <div class="metric-head"><span class="metric-label">RAM</span><span class="metric-val" id="ram-val">—</span></div>
-        <div class="metric-track"><div class="metric-fill" id="ram-bar" style="background:var(--info)"></div></div>
-      </div>
-      <div class="metric-row">
-        <div class="metric-head"><span class="metric-label">GPU</span><span class="metric-val" id="gpu-val">—</span></div>
-        <div class="metric-track"><div class="metric-fill" id="gpu-bar" style="background:var(--success)"></div></div>
+      <div class="monitor-body" id="monitor-body">
+        <div class="metric-row">
+          <div class="metric-head">
+            <span class="metric-label">CPU</span>
+            <span><span class="metric-val" id="cpu-val">—</span><span class="metric-sub" id="cpu-temp-val"></span></span>
+          </div>
+          <div class="metric-track"><div class="metric-fill" id="cpu-bar" style="background:var(--pink)"></div></div>
+        </div>
+        <div class="metric-row">
+          <div class="metric-head">
+            <span class="metric-label">RAM</span>
+            <span><span class="metric-val" id="ram-val">—</span><span class="metric-sub" id="ram-detail"></span></span>
+          </div>
+          <div class="metric-track"><div class="metric-fill" id="ram-bar" style="background:var(--info)"></div></div>
+        </div>
+        <div class="metric-row">
+          <div class="metric-head">
+            <span class="metric-label">GPU</span>
+            <span><span class="metric-val" id="gpu-val">—</span><span class="metric-sub" id="gpu-temp-val"></span></span>
+          </div>
+          <div class="metric-track"><div class="metric-fill" id="gpu-bar" style="background:var(--success)"></div></div>
+        </div>
+        <div class="metric-row" style="margin-bottom:0">
+          <div class="metric-net">
+            <span><span style="color:#333">NET</span></span>
+            <span id="net-val" style="color:#383838">↓ — &nbsp; ↑ —</span>
+          </div>
+        </div>
+        <canvas id="monitor-spark"></canvas>
       </div>
       <div id="detect-result" style="margin-top:8px"></div>
     </div>
@@ -357,6 +413,9 @@ let selectedPreset = null
 let pulseActive = false
 let procData = [], procSort = { key: 'ram', dir: -1 }
 let metricsInterval = null
+let monitorOpen = false
+const SPARK_LEN = 40
+const _sparkCpu = [], _sparkGpu = []
 
 // ── Init ──
 async function init() {
@@ -370,7 +429,7 @@ async function init() {
   `).join('')
 
   loadProcs()
-  startMetrics()
+  initMonitor()
   doPulseDetect()
 }
 
@@ -443,17 +502,86 @@ function setBadge(live) {
   }
 }
 
+// ── Monitor toggle ──
+function toggleMonitor() {
+  monitorOpen = !monitorOpen
+  localStorage.setItem('pulse_monitor_expanded', monitorOpen ? '1' : '0')
+  const body = document.getElementById('monitor-body')
+  const chevron = document.getElementById('monitor-chevron')
+  if (monitorOpen) {
+    body.classList.add('open')
+    chevron.classList.replace('fa-chevron-down', 'fa-chevron-up')
+    startMetrics()
+  } else {
+    body.classList.remove('open')
+    chevron.classList.replace('fa-chevron-up', 'fa-chevron-down')
+    if (metricsInterval) { clearInterval(metricsInterval); metricsInterval = null }
+  }
+}
+
+function initMonitor() {
+  monitorOpen = localStorage.getItem('pulse_monitor_expanded') === '1'
+  if (monitorOpen) {
+    document.getElementById('monitor-body').classList.add('open')
+    document.getElementById('monitor-chevron').classList.replace('fa-chevron-down', 'fa-chevron-up')
+    startMetrics()
+  }
+}
+
 // ── Live metrics ──
+function fmtBytes(b) {
+  if (b >= 1048576) return (b / 1048576).toFixed(1) + ' MB/s'
+  if (b >= 1024)    return (b / 1024).toFixed(0) + ' KB/s'
+  return b + ' B/s'
+}
+
 function startMetrics() {
   if (metricsInterval) clearInterval(metricsInterval)
   metricsInterval = setInterval(async () => {
+    if (!monitorOpen) return
     const m = await api.getMetrics()
     if (!m) return
-    const cpu = m.cpu ?? 0, ram = m.ramPct ?? 0, gpu = m.gpu ?? 0
+    const cpu = m.cpu ?? 0, ram = m.ram ?? 0, gpu = m.gpu ?? 0
     set('cpu-val', `${cpu}%`); set('cpu-bar', null, cpu)
     set('ram-val', `${ram}%`); set('ram-bar', null, ram)
     set('gpu-val', `${gpu}%`); set('gpu-bar', null, gpu)
+    const cpuT = m.cpuTemp > 0 ? `${m.cpuTemp}°C` : ''
+    const gpuT = m.gpuTemp > 0 ? `${m.gpuTemp}°C` : ''
+    set('cpu-temp-val', cpuT)
+    set('gpu-temp-val', gpuT)
+    if (m.ramUsed && m.ramTotal) set('ram-detail', `${m.ramUsed} / ${m.ramTotal} GB`)
+    const nd = m.netDown > 0 ? `↓ ${fmtBytes(m.netDown)}` : '↓ —'
+    const nu = m.netUp   > 0 ? `↑ ${fmtBytes(m.netUp)}`   : '↑ —'
+    set('net-val', `${nd}  ${nu}`)
+    _sparkCpu.push(cpu); if (_sparkCpu.length > SPARK_LEN) _sparkCpu.shift()
+    _sparkGpu.push(gpu); if (_sparkGpu.length > SPARK_LEN) _sparkGpu.shift()
+    drawMonitorSpark()
   }, 2000)
+}
+
+function drawMonitorSpark() {
+  const canvas = document.getElementById('monitor-spark')
+  if (!canvas) return
+  const W = canvas.offsetWidth, H = canvas.offsetHeight
+  if (!W || !H) return
+  canvas.width = W; canvas.height = H
+  const ctx = canvas.getContext('2d')
+  ctx.clearRect(0, 0, W, H)
+  function drawLine(data, color) {
+    if (data.length < 2) return
+    const max = 100, step = W / (SPARK_LEN - 1)
+    ctx.beginPath()
+    ctx.strokeStyle = color
+    ctx.lineWidth = 1.5
+    ctx.lineJoin = 'round'
+    data.forEach((v, i) => {
+      const x = i * step, y = H - (v / max) * H
+      i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y)
+    })
+    ctx.stroke()
+  }
+  drawLine(_sparkGpu, 'rgba(46,204,113,0.6)')
+  drawLine(_sparkCpu, 'rgba(255,46,99,0.7)')
 }
 
 function set(id, text, pct) {
