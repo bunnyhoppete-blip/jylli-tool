@@ -201,9 +201,12 @@ async function destroyDiscordRPC() {
   if (discordRPC) {
     try {
       if (discordReady) {
+        // Clear twice — first call clears the activity, second confirms it
         await discordRPC.clearActivity().catch(() => {})
-        // Give Discord's IPC socket time to process the clear before the socket closes
-        await new Promise(r => setTimeout(r, 500))
+        await new Promise(r => setTimeout(r, 300))
+        await discordRPC.clearActivity().catch(() => {})
+        // Give Discord time to propagate the clear before the socket tears down
+        await new Promise(r => setTimeout(r, 800))
       }
       discordRPC.destroy()
     } catch (_) {}
@@ -1250,6 +1253,32 @@ ipcMain.handle('window-close', (e) => BrowserWindow.fromWebContents(e.sender)?.c
 ipcMain.handle('load-settings', () => loadSettings())
 ipcMain.handle('save-settings', (_, data) => { saveSettings(data); return true })
 
+// ─── Tweak Profiles ───────────────────────────────────────────────────────────
+const PROFILES_PATH = path.join(app.getPath('userData'), 'jt_profiles.json')
+function loadProfiles() {
+  try { return JSON.parse(fs.readFileSync(PROFILES_PATH, 'utf8')) } catch { return {} }
+}
+function saveProfiles(data) {
+  try { fs.writeFileSync(PROFILES_PATH, JSON.stringify(data, null, 2), 'utf8') } catch (_) {}
+}
+ipcMain.handle('list-profiles', () => loadProfiles())
+ipcMain.handle('save-profile', (_, { name, tweaks }) => {
+  const profiles = loadProfiles()
+  profiles[name] = { name, tweaks, savedAt: Date.now() }
+  saveProfiles(profiles)
+  return { ok: true }
+})
+ipcMain.handle('load-profile', (_, name) => {
+  const profiles = loadProfiles()
+  return profiles[name] || null
+})
+ipcMain.handle('delete-profile', (_, name) => {
+  const profiles = loadProfiles()
+  delete profiles[name]
+  saveProfiles(profiles)
+  return { ok: true }
+})
+
 ipcMain.handle('open-external', (_, url) => shell.openExternal(url))
 
 // ─── Discord RPC update handlers ──────────────────────────────────────────────
@@ -1683,6 +1712,85 @@ ipcMain.handle('fivem-write-settings', async (_, changes, manualPath) => {
 })
 
 // ─── FiveM cache clear ────────────────────────────────────────────────────────
+// ─── FiveM Mod Conflict Detector ─────────────────────────────────────────────
+ipcMain.handle('fivem-scan-mods', async () => {
+  const lad = process.env.LOCALAPPDATA || ''
+  const appdata = process.env.APPDATA || ''
+
+  // Known heavy/problematic resource patterns
+  const HEAVY_PATTERNS = [
+    { pattern: /menyoo/i,         name: 'Menyoo',           reason: 'Spawner — causes desyncs on servers that block it', severity: 'high' },
+    { pattern: /trainer/i,        name: 'Trainer',          reason: 'May contain injection hooks that trigger anticheat', severity: 'high' },
+    { pattern: /lambda/i,         name: 'Lambda Menu',      reason: 'Detected by many server anticheat systems', severity: 'high' },
+    { pattern: /scripthookv/i,    name: 'ScriptHookV',      reason: 'Native trainer bypass — blocked by most RP servers', severity: 'high' },
+    { pattern: /visualv/i,        name: 'VisualV',          reason: 'Replaces timecycle/weather — often causes sky glitches', severity: 'medium' },
+    { pattern: /naturalvision/i,  name: 'NaturalVision',    reason: 'Graphics mod — conflicts with server-side weather sync', severity: 'medium' },
+    { pattern: /enb/i,            name: 'ENB',              reason: 'Post-process injector — increases VRAM usage significantly', severity: 'medium' },
+    { pattern: /reshade/i,        name: 'ReShade',          reason: 'Shader overlay — adds frame time overhead (~2–5ms)', severity: 'low' },
+    { pattern: /openiv/i,         name: 'OpenIV',           reason: 'Mod installer — leave ASI loader enabled can cause crashes', severity: 'medium' },
+    { pattern: /heap.*adjuster/i, name: 'Heap Adjuster',    reason: 'Outdated — FiveM has built-in heap management; causes instability on new builds', severity: 'medium' },
+    { pattern: /packfile/i,       name: 'PackfileLimitAdjuster', reason: 'May conflict with server-side packfile limits', severity: 'low' },
+    { pattern: /dirhook/i,        name: 'DirHook',          reason: 'ASI hook — can interfere with FiveM module loading', severity: 'medium' },
+    { pattern: /lspdfr/i,         name: 'LSPDFR',           reason: 'Police mod — not compatible with most RP server environments', severity: 'high' },
+    { pattern: /rage.*hook/i,     name: 'RageHook',         reason: 'Plugin loader — blocks FiveM from starting if loaded', severity: 'high' },
+    { pattern: /discord.*hook/i,  name: 'DiscordRichPresence (mod)', reason: 'Duplicate RPC — conflicts with FiveM built-in Discord integration', severity: 'low' },
+  ]
+
+  // Search locations
+  const searchDirs = [
+    path.join(lad, 'FiveM', 'FiveM.app', 'plugins'),
+    path.join(lad, 'FiveM', 'FiveM.app', 'addons'),
+    path.join(process.env.USERPROFILE || '', 'Documents', 'Rockstar Games', 'GTA V', 'scripts'),
+    path.join(process.env.USERPROFILE || '', 'Documents', 'Rockstar Games', 'GTA V', 'plugins'),
+  ]
+
+  const found = []
+  const scanned = []
+
+  for (const dir of searchDirs) {
+    if (!fs.existsSync(dir)) continue
+    scanned.push(dir)
+    let files
+    try { files = fs.readdirSync(dir) } catch { continue }
+    for (const file of files) {
+      const fileLower = file.toLowerCase()
+      for (const { pattern, name, reason, severity } of HEAVY_PATTERNS) {
+        if (pattern.test(fileLower)) {
+          found.push({ file, dir, name, reason, severity })
+          break
+        }
+      }
+    }
+  }
+
+  // Also check if ReShade DLLs exist in the GTA5 folder
+  const gtaDirs = [
+    path.join('C:', 'Program Files (x86)', 'Steam', 'steamapps', 'common', 'Grand Theft Auto V'),
+    path.join('C:', 'Program Files', 'Rockstar Games', 'Grand Theft Auto V'),
+    path.join('C:', 'Program Files (x86)', 'Rockstar Games', 'Grand Theft Auto V'),
+  ]
+  for (const dir of gtaDirs) {
+    if (!fs.existsSync(dir)) continue
+    scanned.push(dir)
+    let files
+    try { files = fs.readdirSync(dir) } catch { continue }
+    for (const file of files) {
+      const fileLower = file.toLowerCase()
+      if (/reshade|dxgi\.dll|d3d11\.dll/i.test(fileLower) && fileLower !== 'd3d11.dll') {
+        found.push({ file, dir, name: 'ReShade / DLL override', reason: 'D3D hook DLL in GTA5 folder — adds overhead and may flag anticheat', severity: 'medium' })
+      }
+      for (const { pattern, name, reason, severity } of HEAVY_PATTERNS) {
+        if (pattern.test(fileLower)) {
+          found.push({ file, dir, name, reason, severity })
+          break
+        }
+      }
+    }
+  }
+
+  return { ok: true, found, scanned }
+})
+
 ipcMain.handle('fivem-clear-cache', async () => {
   const send = (msg, level) => mainWindow?.webContents.send('log', { msg, level, ts: new Date().toLocaleTimeString() })
   const lad = process.env.LOCALAPPDATA || ''
@@ -4637,6 +4745,14 @@ ipcMain.handle('install-update', () => {
 
 // What's New content
 const WHATS_NEW = [
+  { version: '1.3.3', date: 'May 2026', items: [
+    'Arma Reforger Graphics Settings — dedicated window to edit platform.json directly, with system-tier-aware recommended settings, Quality/Performance presets, and instant save',
+    'Tweak Profiles — save your current applied tweaks as a named profile and load them with one click (Gaming Mode, Work Mode, etc.)',
+    'Per-game boost profiles — assign a saved tweak profile to any game in Game Profiles; automatically applied when that game launches via Game Watcher',
+    'FiveM Mod Conflict Detector — scans GTA V and FiveM plugin folders for mods that cause crashes, performance loss, or anticheat flags',
+    'Latency Monitor — live DPC/ISR% chart with timer resolution display and fix recommendations',
+    'Discord status fix — double-clear with extended flush window; status now reliably disappears after app close',
+  ]},
   { version: '1.3', date: 'May 2026', items: [
     'Theme fix — switching themes now correctly recolors every element: buttons, glow effects, canvas charts, hover highlights, and all accent colors',
     'Discord status fix — status now reliably clears when the app closes (500ms flush window added before socket teardown)',
@@ -5060,6 +5176,144 @@ ipcMain.handle('close-fivem-settings', () => {
   fivemSettingsWindow = null
 })
 
+// ─── Arma Reforger Settings Window ───────────────────────────────────────────
+let armaSettingsWindow = null
+
+ipcMain.handle('open-arma-settings', () => {
+  if (armaSettingsWindow && !armaSettingsWindow.isDestroyed()) {
+    armaSettingsWindow.focus()
+    return
+  }
+  armaSettingsWindow = new BrowserWindow({
+    width: 720,
+    height: 780,
+    minWidth: 580,
+    minHeight: 520,
+    frame: false,
+    transparent: false,
+    backgroundColor: '#0d0d0d',
+    show: false,
+    title: 'Arma Reforger Graphics Settings',
+    icon: path.join(__dirname, 'assets', 'icon.png'),
+    webPreferences: {
+      preload: path.join(__dirname, 'preload.js'),
+      nodeIntegration: false,
+      contextIsolation: true,
+      sandbox: false
+    }
+  })
+  armaSettingsWindow.loadFile('arma-settings.html')
+  armaSettingsWindow.once('ready-to-show', () => armaSettingsWindow.show())
+  armaSettingsWindow.on('closed', () => { armaSettingsWindow = null })
+})
+
+ipcMain.handle('close-arma-settings', () => {
+  if (armaSettingsWindow && !armaSettingsWindow.isDestroyed()) armaSettingsWindow.close()
+  armaSettingsWindow = null
+})
+
+function findArmaSettings(manualPath) {
+  if (manualPath && fs.existsSync(manualPath)) return manualPath
+  const appdata = process.env.APPDATA || ''
+  const candidates = [
+    path.join(appdata, 'ArmaReforger', 'platform.json'),
+    path.join(appdata, 'Bohemia Interactive', 'ArmaReforger', 'platform.json'),
+  ]
+  return candidates.find(p => fs.existsSync(p)) || null
+}
+
+ipcMain.handle('arma-read-settings', async (_, manualPath) => {
+  const settingsPath = findArmaSettings(manualPath)
+  if (!settingsPath) {
+    return {
+      ok: false,
+      reason: 'platform.json not found in %APPDATA%\\ArmaReforger\\',
+      hint: 'Launch Arma Reforger, go to Settings → Graphics, change any option and quit the game. The file will be created automatically.'
+    }
+  }
+  let raw
+  try { raw = fs.readFileSync(settingsPath, 'utf8') } catch (e) {
+    return { ok: false, reason: `Could not read ${settingsPath}: ${e.message}` }
+  }
+  let json
+  try { json = JSON.parse(raw) } catch (e) {
+    return { ok: false, reason: `platform.json is not valid JSON: ${e.message}` }
+  }
+
+  // Read dot-notation keys from nested JSON
+  function getNestedVal(obj, dotKey) {
+    const parts = dotKey.split('.')
+    let cur = obj
+    for (const p of parts) {
+      if (cur == null || typeof cur !== 'object') return null
+      cur = cur[p]
+    }
+    return cur != null ? String(cur) : null
+  }
+
+  const ARMA_KEYS = [
+    'renderer.renderResolutionScaleMultiplier','renderer.objectLOD','renderer.terrainQuality',
+    'renderer.shadowQuality','renderer.shadowDistance','renderer.shadowCascades',
+    'renderer.textureQuality','renderer.textureStreamingQuality','renderer.anisotropy',
+    'renderer.ambientOcclusion','renderer.bloomQuality','renderer.motionBlur',
+    'renderer.depthOfField','renderer.cloudsQuality','renderer.vegetationQuality',
+    'renderer.antiAliasing','renderer.windowMode','renderer.vsync',
+  ]
+
+  const vals = {}
+  for (const k of ARMA_KEYS) vals[k] = getNestedVal(json, k)
+
+  return { ok: true, vals, path: settingsPath }
+})
+
+ipcMain.handle('arma-write-settings', async (_, changes, manualPath) => {
+  const settingsPath = findArmaSettings(manualPath)
+  if (!settingsPath) return { ok: false, reason: 'platform.json not found — cannot save.' }
+  let raw
+  try { raw = fs.readFileSync(settingsPath, 'utf8') } catch (e) {
+    return { ok: false, reason: `Could not read file: ${e.message}` }
+  }
+  let json
+  try { json = JSON.parse(raw) } catch (e) {
+    return { ok: false, reason: `File is not valid JSON: ${e.message}` }
+  }
+
+  // Backup
+  try { fs.writeFileSync(settingsPath + '.bak', raw, 'utf8') } catch (_) {}
+
+  // Write dot-notation keys into nested JSON
+  function setNestedVal(obj, dotKey, val) {
+    const parts = dotKey.split('.')
+    let cur = obj
+    for (let i = 0; i < parts.length - 1; i++) {
+      if (cur[parts[i]] == null || typeof cur[parts[i]] !== 'object') cur[parts[i]] = {}
+      cur = cur[parts[i]]
+    }
+    const last = parts[parts.length - 1]
+    // Coerce type: if original was number, keep number; boolean string → boolean
+    const orig = cur[last]
+    if (typeof orig === 'number') cur[last] = parseFloat(val)
+    else if (typeof orig === 'boolean') cur[last] = val === 'true' || val === '1'
+    else if (orig == null) {
+      // Try numeric, else string
+      const n = parseFloat(val)
+      cur[last] = isNaN(n) ? val : n
+    } else cur[last] = val
+  }
+
+  for (const [key, val] of Object.entries(changes)) {
+    setNestedVal(json, key, val)
+  }
+
+  try {
+    fs.writeFileSync(settingsPath, JSON.stringify(json, null, 2), 'utf8')
+  } catch (e) {
+    return { ok: false, reason: `Could not write file: ${e.message}` }
+  }
+
+  return { ok: true, path: settingsPath, changed: Object.keys(changes).length }
+})
+
 // ─── Pulse ────────────────────────────────────────────────────────────────────
 const PULSE_PRESETS = {
   fortnite:     { name: 'Fortnite',            exe: 'FortniteClient-Win64-Shipping', priority: 'High',        killList: ['EpicGamesLauncher','EpicWebHelper','chrome','msedge'] },
@@ -5431,6 +5685,40 @@ ipcMain.handle('toggle-startup-item', async (_, { name, source, key, enable }) =
 })
 
 // ─── Network Ping Test ────────────────────────────────────────────────────────
+ipcMain.handle('get-latency-sample', async () => {
+  const r = await runPS(`
+    Add-Type @"
+    using System;
+    using System.Runtime.InteropServices;
+    public class TimerRes {
+      [DllImport("ntdll.dll")] public static extern int NtQueryTimerResolution(out uint min, out uint max, out uint cur);
+      public static string Get() {
+        uint min, max, cur;
+        NtQueryTimerResolution(out min, out max, out cur);
+        return min + "," + max + "," + cur;
+      }
+    }
+"@
+    $tr = [TimerRes]::Get()
+    $dpc = (Get-Counter '\\Processor(_Total)\\% DPC Time' -ErrorAction SilentlyContinue).CounterSamples[0].CookedValue
+    $isr = (Get-Counter '\\Processor(_Total)\\% Interrupt Time' -ErrorAction SilentlyContinue).CounterSamples[0].CookedValue
+    Write-Output "TIMER=$tr"
+    Write-Output "DPC=$([math]::Round($dpc,2))"
+    Write-Output "ISR=$([math]::Round($isr,2))"
+  `, 8000)
+  const lines = (r.out || '').split('\n').map(l => l.trim()).filter(Boolean)
+  const get = key => { const l = lines.find(l => l.startsWith(key + '=')); return l ? l.slice(key.length + 1) : null }
+  const timerParts = (get('TIMER') || '').split(',').map(Number)
+  return {
+    ok: r.ok,
+    timerMin: timerParts[0] ? Math.round(timerParts[0] / 10000) : null,
+    timerMax: timerParts[1] ? Math.round(timerParts[1] / 10000) : null,
+    timerCur: timerParts[2] ? (timerParts[2] / 10000).toFixed(2) : null,
+    dpcPct: parseFloat(get('DPC')) || 0,
+    isrPct: parseFloat(get('ISR')) || 0,
+  }
+})
+
 ipcMain.handle('run-ping-tests', async () => {
   mainWindow?.webContents.send('log', { msg: '◆ Running ping tests…', level: 'head', ts: new Date().toLocaleTimeString() })
 
@@ -5608,6 +5896,28 @@ ipcMain.handle('start-game-watcher', async () => {
       await runPS('Set-ItemProperty -Path "HKCU:\\System\\GameConfigStore" -Name GameDVR_Enabled -Value 0 -Force')
       mainWindow?.webContents.send('log', { msg: `✓ Auto-profile applied for ${presetName}`, level: 'ok', ts: new Date().toLocaleTimeString() })
 
+      // Per-game tweak profile: apply if one is assigned to this game
+      const curSettings = loadSettings()
+      const assignedProfile = curSettings[`gameProfile_${detectedGame}`]
+      if (assignedProfile) {
+        const profiles = loadProfiles()
+        const profile = profiles[assignedProfile]
+        if (profile) {
+          mainWindow?.webContents.send('log', { msg: `  Applying tweak profile: ${assignedProfile}`, level: 'info', ts: new Date().toLocaleTimeString() })
+          for (const [k, v] of Object.entries(profile.tweaks)) {
+            if (v === 'applied') {
+              const tweakId = k.replace(/^tweak_/, '')
+              const TWEAKS_obj = TWEAKS
+              if (TWEAKS_obj[tweakId]?.apply) {
+                await TWEAKS_obj[tweakId].apply().catch(() => {})
+              }
+            }
+          }
+          mainWindow?.webContents.send('log', { msg: `  ✓ Tweak profile "${assignedProfile}" applied`, level: 'ok', ts: new Date().toLocaleTimeString() })
+          mainWindow?.webContents.send('game-watcher-event', { event: 'profile-applied', gameId: detectedGame, profileName: assignedProfile })
+        }
+      }
+
       // Auto-Pulse: activate if enabled (preset already matched — use it directly)
       const currentSettings = loadSettings()
       if (currentSettings.autoPulseEnabled && !pulseActivePreset) {
@@ -5763,6 +6073,34 @@ ipcMain.handle('get-temp-size', async () => {
   else if (mb < 1024) { label = `${Math.round(mb)} MB`;  pct = Math.round((mb / 2048) * 100) }
   else                { label = `${(mb / 1024).toFixed(1)} GB`; pct = Math.min(100, Math.round((mb / 4096) * 100)) }
   return { bytes, mb: Math.round(mb), label, pct }
+})
+
+ipcMain.handle('clean-ram', async () => {
+  // Empty standby list + working sets via RAMMap-style PowerShell C# call
+  const r = await runPS(`
+    Add-Type @"
+    using System;
+    using System.Runtime.InteropServices;
+    public class RamCleaner {
+      [DllImport("psapi.dll")] public static extern bool EmptyWorkingSet(IntPtr hProcess);
+      [DllImport("ntdll.dll")] public static extern uint NtSetSystemInformation(int InfoClass, IntPtr Info, int Length);
+      public static void ClearStandby() {
+        IntPtr buf = Marshal.AllocHGlobal(4);
+        Marshal.WriteInt32(buf, 0, 4);
+        NtSetSystemInformation(80, buf, 4);
+        Marshal.FreeHGlobal(buf);
+      }
+    }
+"@
+    [RamCleaner]::ClearStandby()
+    Get-Process | ForEach-Object { try { [RamCleaner]::EmptyWorkingSet($_.Handle) } catch {} }
+    $mem = Get-CimInstance Win32_OperatingSystem
+    $freeMB = [math]::Round($mem.FreePhysicalMemory / 1024)
+    Write-Output "FREE_MB=$freeMB"
+  `, 30000)
+  const match = r.out?.match(/FREE_MB=(\d+)/)
+  const freeMB = match ? parseInt(match[1]) : 0
+  return { ok: r.ok || freeMB > 0, freeMB }
 })
 
 ipcMain.handle('get-health-score', async (_, settings) => {

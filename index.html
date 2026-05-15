@@ -207,6 +207,24 @@ html, body { height: 100%; overflow: hidden; background: var(--bg); color: var(-
   100% { transform: translateX(350%); }
 }
 
+/* Page skeleton shimmer */
+@keyframes shimmer {
+  0%   { background-position: -400px 0; }
+  100% { background-position: 400px 0; }
+}
+.skeleton {
+  background: linear-gradient(90deg, var(--bg-card) 25%, var(--bg-card2) 50%, var(--bg-card) 75%);
+  background-size: 800px 100%;
+  animation: shimmer 1.4s infinite linear;
+  border-radius: 4px;
+}
+/* Pulse animation for buttons mid-action */
+@keyframes btnPulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(var(--pink-rgb),0.4); }
+  50%       { box-shadow: 0 0 0 6px rgba(var(--pink-rgb),0); }
+}
+.btn-running { animation: btnPulse 1s ease-in-out infinite; }
+
 /* Warning banner inside row */
 .spec-warning {
   width: 100%; padding: 6px 12px; margin-top: 6px;
@@ -861,6 +879,18 @@ canvas.radar-canvas { width: 180px; height: 180px; }
 #page-content {
   scroll-behavior: smooth;
 }
+/* ─── UNDO SNACKBAR ──────────────────────────────────────────────────────── */
+#undo-snackbar {
+  position: fixed; bottom: 170px; left: 50%; transform: translateX(-50%) translateY(20px);
+  background: var(--bg-card2); border: 1px solid var(--border); border-radius: 8px;
+  padding: 8px 14px; display: flex; align-items: center; gap: 10px;
+  font-size: 11px; color: var(--gray); z-index: 9998; opacity: 0;
+  transition: opacity 0.2s, transform 0.2s; pointer-events: none;
+}
+#undo-snackbar.visible { opacity: 1; transform: translateX(-50%) translateY(0); pointer-events: auto; }
+#undo-snackbar button { background: var(--pink-dim); border: 1px solid rgba(var(--pink-rgb),0.3); color: var(--pink); border-radius: 5px; padding: 3px 10px; font-size: 10px; font-weight: 700; cursor: pointer; font-family: inherit; }
+#undo-snackbar button:hover { background: var(--pink); color: #fff; }
+
 /* ─── TOAST NOTIFICATIONS ────────────────────────────────────────────────── */
 #toast-container { position: fixed; bottom: 170px; right: 16px; z-index: 9999; display: flex; flex-direction: column; gap: 8px; pointer-events: none; }
 .toast {
@@ -1026,6 +1056,67 @@ input:checked + .pill-slider:before { transform: translateX(18px); background: w
 .cl-title { font-size: 12px; font-weight: 600; color: var(--white); }
 .cl-ts    { font-size: 10px; color: var(--muted); }
 
+/* ─── LATENCY MONITOR ────────────────────────────────────────────────────── */
+.latency-stat-card { flex:1; min-width:100px; background:rgba(255,255,255,0.03); border:1px solid var(--border2); border-radius:8px; padding:10px 14px; }
+.latency-stat-label { font-size:9px; text-transform:uppercase; letter-spacing:.06em; color:var(--muted); margin-bottom:4px; }
+.latency-stat-val { font-size:22px; font-weight:800; color:var(--white); line-height:1.1; }
+.latency-stat-sub { font-size:9px; color:var(--muted); margin-top:3px; }
+.latency-info-row { font-size:11px; color:var(--text); display:flex; align-items:center; gap:8px; }
+.latency-dot { width:8px; height:8px; border-radius:50%; flex-shrink:0; background:var(--success); }
+.latency-dot.warn { background:var(--warning); }
+.latency-dot.bad  { background:var(--danger); }
+.latency-fix-row { font-size:11px; color:var(--text); }
+
+/* ─── MOD CONFLICT DETECTOR ──────────────────────────────────────────────── */
+.mod-conflict-row {
+  display: flex; align-items: flex-start; gap: 10px;
+  padding: 10px 18px; border-bottom: 1px solid var(--border2);
+  transition: background 0.1s;
+}
+.mod-conflict-row:last-child { border-bottom: none; }
+.mod-conflict-row:hover { background: rgba(255,255,255,0.02); }
+.mod-sev-badge {
+  flex-shrink: 0; font-size: 9px; font-weight: 700;
+  padding: 2px 7px; border-radius: 20px;
+  text-transform: uppercase; letter-spacing: 0.05em;
+  align-self: flex-start; margin-top: 1px;
+}
+.sev-high   { background: rgba(231,76,60,0.12);  color: #e74c3c; border: 1px solid rgba(231,76,60,0.3); }
+.sev-medium { background: rgba(241,196,15,0.10);  color: #f1c40f; border: 1px solid rgba(241,196,15,0.3); }
+.sev-low    { background: rgba(149,165,166,0.10); color: #95a5a6; border: 1px solid rgba(149,165,166,0.25); }
+
+/* ─── GAME PROFILE SELECT ────────────────────────────────────────────────── */
+.gp-profile-select {
+  flex: 1; background: rgba(255,255,255,0.04); border: 1px solid var(--border2);
+  border-radius: 7px; padding: 6px 10px; color: var(--white);
+  font-size: 11px; outline: none; cursor: pointer; transition: border-color 0.15s;
+}
+.gp-profile-select:focus { border-color: var(--pink); }
+
+/* ─── TWEAK PROFILES ─────────────────────────────────────────────────────── */
+.profile-name-input {
+  flex: 1; background: rgba(255,255,255,0.04); border: 1px solid var(--border2);
+  border-radius: 8px; padding: 7px 12px; color: var(--white);
+  font-size: 11px; outline: none; transition: border-color 0.15s;
+}
+.profile-name-input:focus { border-color: var(--pink); }
+.profile-row {
+  display: flex; align-items: center; gap: 12px;
+  padding: 10px 18px; border-bottom: 1px solid var(--border2);
+  transition: background 0.1s;
+}
+.profile-row:last-child { border-bottom: none; }
+.profile-row:hover { background: rgba(255,255,255,0.02); }
+.profile-row-icon {
+  width: 32px; height: 32px; border-radius: 8px; flex-shrink: 0;
+  background: rgba(var(--pink-rgb),0.08); border: 1px solid rgba(var(--pink-rgb),0.2);
+  display: flex; align-items: center; justify-content: center;
+  color: var(--pink); font-size: 13px;
+}
+.profile-row-info { flex: 1; min-width: 0; }
+.profile-row-name { font-size: 12px; font-weight: 700; color: var(--white); }
+.profile-row-meta { font-size: 10px; color: var(--muted); margin-top: 2px; }
+
 /* ─── SCHEDULER ──────────────────────────────────────────────────────────── */
 .schedule-row { display: flex; align-items: center; padding: 10px 18px; border-bottom: 1px solid var(--border2); gap: 12px; }
 .schedule-row:last-child { border-bottom: none; }
@@ -1117,6 +1208,7 @@ select.styled-select:focus { border-color: var(--pink); }
 
 <!-- Toast container -->
 <div id="toast-container"></div>
+<div id="undo-snackbar"><span id="undo-snackbar-label">Tweak applied</span><button onclick="undoLastTweak()"><i class="fa fa-rotate-left"></i> Undo</button></div>
 
 <!-- Update banner -->
 <div id="update-banner" style="display:none">
@@ -1360,6 +1452,9 @@ select.styled-select:focus { border-color: var(--pink); }
         <span class="nav-icon"><i class="fa fa-microchip"></i></span><span class="nav-label">Processes</span>
         <span class="nav-badge" id="badge-boost" style="display:none">LIVE</span>
       </button>
+      <button class="nav-btn" data-page="latency-monitor" onclick="showPage('latency-monitor')">
+        <span class="nav-icon"><i class="fa fa-wave-square"></i></span><span class="nav-label">Latency</span>
+      </button>
       <div class="sidebar-section-label" style="margin-top:4px">Tweaks</div>
       <button class="nav-btn" data-page="windows-opti" onclick="showPage('windows-opti')">
         <span class="nav-icon"><i class="fa fa-windows fab"></i></span><span class="nav-label">General</span>
@@ -1397,6 +1492,9 @@ select.styled-select:focus { border-color: var(--pink); }
       </button>
       <button class="nav-btn" data-page="changelog" onclick="showPage('changelog')">
         <span class="nav-icon"><i class="fa fa-clipboard-list"></i></span><span class="nav-label">Tweak History</span>
+      </button>
+      <button class="nav-btn" data-page="tweak-profiles" onclick="showPage('tweak-profiles')">
+        <span class="nav-icon"><i class="fa fa-layer-group"></i></span><span class="nav-label">Profiles</span>
       </button>
       <div class="sidebar-divider"></div>
       <button class="nav-btn" data-page="personalization" onclick="showPage('personalization')">
@@ -1471,6 +1569,7 @@ function _confirmModalReject()  { document.getElementById('confirm-modal').style
 async function init() {
   settings = await api.loadSettings() || {}
   initPersonalization()
+  window._whatsNew = await api.getWhatsNew().catch(() => [])
 
   const appVersion = await api.getAppVersion()
   document.getElementById('load-ver').textContent       = `v${appVersion} — Detecting system specs…`
@@ -1708,7 +1807,7 @@ function showPage(page) {
     'hardware':'Advanced','startup-manager':'Startups','game-opti':'Game Profiles',
     'app-optimizer':'App Optimizer','fivem':'FiveM','cleanup':'Cleanup',
     'ping-test':'Ping Test','scheduler':'Scheduler','changelog':'Tweak History',
-    'personalization':'Personalization',
+    'personalization':'Personalization','latency-monitor':'Latency Monitor','tweak-profiles':'Tweak Profiles',
   }
   const t = TITLES[page] || page
   document.getElementById('page-title').textContent = t
@@ -1718,6 +1817,7 @@ function showPage(page) {
 
   if (metricsInterval && page !== 'dashboard' && page !== 'process-manager') { clearInterval(metricsInterval); metricsInterval = null }
   if (page === 'dashboard' || page === 'process-manager') startMetrics()
+  if (page !== 'latency-monitor') stopLatencyPolling()
   api.discordSetPage(page).catch(() => {})
   api.analyticsPageVisit(page).catch(() => {})
 
@@ -1743,7 +1843,8 @@ function showPage(page) {
       'startup-manager': buildStartupManager, 'game-opti': buildGameOpti,
       'app-optimizer': buildAppOptimizer, fivem: buildFiveM, cleanup: buildCleanup,
       'ping-test': buildPingTest, scheduler: buildScheduler, changelog: buildChangelog,
-      personalization: buildPersonalization,
+      personalization: buildPersonalization, 'latency-monitor': buildLatencyMonitor,
+      'tweak-profiles': buildTweakProfiles,
     }
     builders[page]?.(c)
     setTimeout(addRippleToButtons, 50)
@@ -1947,6 +2048,30 @@ async function startUpdateDownload() {
   }
 }
 
+// ─── Undo last tweak ─────────────────────────────────────────────────────────
+let _lastAppliedTweak = null
+let _undoTimer = null
+function showUndoSnackbar(id, name) {
+  _lastAppliedTweak = id
+  const bar = document.getElementById('undo-snackbar')
+  const label = document.getElementById('undo-snackbar-label')
+  if (!bar) return
+  if (label) label.textContent = `Applied: ${name}`
+  bar.classList.add('visible')
+  clearTimeout(_undoTimer)
+  _undoTimer = setTimeout(() => bar.classList.remove('visible'), 8000)
+}
+function hideUndoSnackbar() {
+  document.getElementById('undo-snackbar')?.classList.remove('visible')
+  clearTimeout(_undoTimer)
+}
+async function undoLastTweak() {
+  if (!_lastAppliedTweak) return
+  hideUndoSnackbar()
+  await applyTweak(_lastAppliedTweak, 'restore')
+  _lastAppliedTweak = null
+}
+
 // ─── Theme color helpers ──────────────────────────────────────────────────────
 function pinkRgb() { return getComputedStyle(document.documentElement).getPropertyValue('--pink-rgb').trim() || '255,46,99' }
 function pinkHex() { return getComputedStyle(document.documentElement).getPropertyValue('--pink').trim() || '#FF2E63' }
@@ -2129,18 +2254,23 @@ function handleSearch(val) {
     r.label.toLowerCase().includes(q) || r.desc.toLowerCase().includes(q) || r.page.includes(q)
   ).slice(0, 8)
   if (!results.length) { drop.style.display = 'none'; return }
-  drop.innerHTML = results.map(r => `
-    <div onclick="searchGo('${r.page}','${r.id}')"
-      style="padding:8px 12px;cursor:pointer;border-bottom:1px solid var(--border2);display:flex;gap:10px;align-items:center;transition:background 0.1s"
+  drop.innerHTML = results.map(r => {
+    const applied = settings[`tweak_${r.id}`] === 'applied'
+    const statusBadge = applied ? `<span style="font-size:8px;font-weight:700;color:var(--success);background:var(--success-bg);border:1px solid #1a5c35;padding:1px 5px;border-radius:3px;margin-left:5px">APPLIED</span>` : ''
+    return `<div onclick="searchGo('${r.page}','${r.id}')"
+      style="padding:9px 12px;cursor:pointer;border-bottom:1px solid var(--border2);display:flex;gap:10px;align-items:flex-start;transition:background 0.1s"
       onmouseenter="this.style.background='rgba('+getComputedStyle(document.documentElement).getPropertyValue('--pink-rgb').trim()+',0.06)'"
       onmouseleave="this.style.background=''">
-      <div style="flex:1">
-        <div style="font-size:11px;font-weight:600;color:var(--white)">${r.label}</div>
-        <div style="font-size:10px;color:var(--muted)">${r.desc}</div>
+      <div style="flex:1;min-width:0">
+        <div style="display:flex;align-items:center;flex-wrap:wrap;gap:4px;margin-bottom:2px">
+          <span style="font-size:11px;font-weight:600;color:var(--white)">${r.label}</span>
+          ${statusBadge}
+        </div>
+        <div style="font-size:10px;color:var(--gray);line-height:1.4">${r.desc}</div>
       </div>
-      <div style="font-size:9px;color:var(--pink);background:var(--pink-dim);padding:2px 7px;border-radius:4px;flex-shrink:0">${r.page.replace('-',' ')}</div>
-    </div>
-  `).join('')
+      <div style="font-size:9px;color:var(--pink);background:var(--pink-dim);padding:2px 7px;border-radius:4px;flex-shrink:0;margin-top:2px;white-space:nowrap">${r.page.replace(/-/g,' ')}</div>
+    </div>`
+  }).join('')
   drop.style.display = 'block'
 }
 
@@ -3581,6 +3711,300 @@ async function doGameScan(btn) {
   toast(`Game scan complete`, `${installed.length} games found`, 'ok')
 }
 
+// ─── Latency Monitor ─────────────────────────────────────────────────────────
+let _latencyInterval = null
+const _latencyHistory = { dpc: [], isr: [] }
+const LATENCY_MAX_POINTS = 60
+
+function buildLatencyMonitor(c) {
+  c.innerHTML = `
+    <div class="section-card">
+      <div class="section-header"><div class="section-accent"></div><div class="section-title">DPC / ISR Latency Monitor</div></div>
+      <div class="section-subtitle">Live kernel-mode interrupt latency. High DPC/ISR % causes audio stutters and input lag.</div>
+      <div style="padding:12px 18px 8px;display:flex;gap:12px;flex-wrap:wrap">
+        <div class="latency-stat-card" id="lat-dpc-card">
+          <div class="latency-stat-label">DPC %</div>
+          <div class="latency-stat-val" id="lat-dpc-val">—</div>
+          <div class="latency-stat-sub" id="lat-dpc-peak">Peak: —</div>
+        </div>
+        <div class="latency-stat-card" id="lat-isr-card">
+          <div class="latency-stat-label">ISR %</div>
+          <div class="latency-stat-val" id="lat-isr-val">—</div>
+          <div class="latency-stat-sub" id="lat-isr-peak">Peak: —</div>
+        </div>
+        <div class="latency-stat-card">
+          <div class="latency-stat-label">Timer Resolution</div>
+          <div class="latency-stat-val" id="lat-timer-val">—</div>
+          <div class="latency-stat-sub" id="lat-timer-sub">Current (µs)</div>
+        </div>
+        <div class="latency-stat-card">
+          <div class="latency-stat-label">Status</div>
+          <div class="latency-stat-val" id="lat-status-val" style="font-size:13px">—</div>
+          <div class="latency-stat-sub" id="lat-status-sub">—</div>
+        </div>
+      </div>
+      <div style="padding:0 18px 4px;display:flex;align-items:center;gap:6px">
+        <span style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em">DPC</span>
+        <div style="flex:1;position:relative;height:72px;background:rgba(255,255,255,0.02);border-radius:6px;overflow:hidden">
+          <canvas id="canvas-dpc" style="width:100%;height:72px"></canvas>
+        </div>
+      </div>
+      <div style="padding:4px 18px 12px;display:flex;align-items:center;gap:6px">
+        <span style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em">ISR</span>
+        <div style="flex:1;position:relative;height:72px;background:rgba(255,255,255,0.02);border-radius:6px;overflow:hidden">
+          <canvas id="canvas-isr" style="width:100%;height:72px"></canvas>
+        </div>
+      </div>
+    </div>
+    <div class="section-card">
+      <div class="section-header"><div class="section-accent"></div><div class="section-title">What does this mean?</div></div>
+      <div style="padding:4px 18px 14px;display:flex;flex-direction:column;gap:8px">
+        <div class="latency-info-row"><span class="latency-dot good"></span><strong>DPC &lt; 1%</strong> — Excellent. No interrupt latency issues.</div>
+        <div class="latency-info-row"><span class="latency-dot warn"></span><strong>DPC 1–3%</strong> — Moderate. Minor audio glitches possible under load.</div>
+        <div class="latency-info-row"><span class="latency-dot bad"></span><strong>DPC &gt; 3%</strong> — High. Common causes: bad drivers (network, audio, GPU), old BIOS, C-states.</div>
+        <div class="latency-info-row"><span class="latency-dot"></span><strong>Timer Resolution</strong> — Windows default is 15,625 µs. Games lower it to ~500 µs. Lower = more precise scheduling.</div>
+      </div>
+    </div>
+    <div class="section-card">
+      <div class="section-header"><div class="section-accent"></div><div class="section-title">Quick Fixes</div></div>
+      <div style="padding:8px 18px 14px;display:flex;flex-direction:column;gap:6px">
+        <div class="latency-fix-row"><i class="fa fa-arrow-right" style="color:var(--pink);margin-right:6px"></i>Apply <strong>C-States disable</strong> in Advanced → Hardware tweaks</div>
+        <div class="latency-fix-row"><i class="fa fa-arrow-right" style="color:var(--pink);margin-right:6px"></i>Apply <strong>MSI Mode</strong> to enable message-signaled interrupts</div>
+        <div class="latency-fix-row"><i class="fa fa-arrow-right" style="color:var(--pink);margin-right:6px"></i>Update or roll back audio/NIC drivers if DPC is consistently high</div>
+        <div class="latency-fix-row"><i class="fa fa-arrow-right" style="color:var(--pink);margin-right:6px"></i>Enable HPET or disable it depending on your platform (try both)</div>
+      </div>
+    </div>
+  `
+
+  _latencyHistory.dpc = []
+  _latencyHistory.isr = []
+  startLatencyPolling()
+}
+
+function startLatencyPolling() {
+  stopLatencyPolling()
+  pollLatency()
+  _latencyInterval = setInterval(pollLatency, 2000)
+}
+
+function stopLatencyPolling() {
+  if (_latencyInterval) { clearInterval(_latencyInterval); _latencyInterval = null }
+}
+
+async function pollLatency() {
+  if (currentPage !== 'latency-monitor') { stopLatencyPolling(); return }
+  try {
+    const s = await api.getLatencySample()
+
+    const dpc = parseFloat(s.dpcPct) || 0
+    const isr = parseFloat(s.isrPct) || 0
+    const timerUs = s.timerCur ? parseFloat(s.timerCur) * 1000 : 0  // timerCur is ms, display as µs
+
+    _latencyHistory.dpc.push(dpc)
+    _latencyHistory.isr.push(isr)
+    if (_latencyHistory.dpc.length > LATENCY_MAX_POINTS) _latencyHistory.dpc.shift()
+    if (_latencyHistory.isr.length > LATENCY_MAX_POINTS) _latencyHistory.isr.shift()
+
+    const dpcPeak = Math.max(..._latencyHistory.dpc)
+    const isrPeak = Math.max(..._latencyHistory.isr)
+
+    const dpcColor = dpc > 3 ? 'var(--danger)' : dpc > 1 ? 'var(--warning)' : 'var(--success)'
+    const isrColor = isr > 3 ? 'var(--danger)' : isr > 1 ? 'var(--warning)' : 'var(--success)'
+
+    const dpcEl = document.getElementById('lat-dpc-val')
+    const isrEl = document.getElementById('lat-isr-val')
+    const dpcPeakEl = document.getElementById('lat-dpc-peak')
+    const isrPeakEl = document.getElementById('lat-isr-peak')
+    const timerEl = document.getElementById('lat-timer-val')
+    const timerSubEl = document.getElementById('lat-timer-sub')
+    const statusEl = document.getElementById('lat-status-val')
+    const statusSubEl = document.getElementById('lat-status-sub')
+
+    if (dpcEl) { dpcEl.textContent = dpc.toFixed(2) + '%'; dpcEl.style.color = dpcColor }
+    if (isrEl) { isrEl.textContent = isr.toFixed(2) + '%'; isrEl.style.color = isrColor }
+    if (dpcPeakEl) dpcPeakEl.textContent = `Peak: ${dpcPeak.toFixed(2)}%`
+    if (isrPeakEl) isrPeakEl.textContent = `Peak: ${isrPeak.toFixed(2)}%`
+    if (timerEl) { timerEl.textContent = timerUs > 0 ? timerUs.toFixed(0) + ' µs' : '—'; timerEl.style.color = timerUs > 0 && timerUs < 2000 ? 'var(--success)' : 'var(--muted)' }
+    if (timerSubEl) timerSubEl.textContent = timerUs > 0 ? (timerUs < 2000 ? 'Low — game/app active' : 'Default — 15.6 ms') : 'Timer resolution'
+
+    const combined = dpc + isr
+    let statusText, statusSub, statusColor
+    if (combined < 1) { statusText = 'Excellent'; statusSub = 'No latency issues detected'; statusColor = 'var(--success)' }
+    else if (combined < 3) { statusText = 'Moderate'; statusSub = 'Minor issues possible'; statusColor = 'var(--warning)' }
+    else { statusText = 'High'; statusSub = 'Check drivers / C-states'; statusColor = 'var(--danger)' }
+    if (statusEl) { statusEl.textContent = statusText; statusEl.style.color = statusColor }
+    if (statusSubEl) statusSubEl.textContent = statusSub
+
+    drawLatencyCanvas('dpc', _latencyHistory.dpc, dpcColor)
+    drawLatencyCanvas('isr', _latencyHistory.isr, isrColor)
+  } catch { /* silent */ }
+}
+
+function drawLatencyCanvas(id, hist, lineColor) {
+  const canvas = document.getElementById(`canvas-${id}`)
+  if (!canvas) return
+  const rect = canvas.getBoundingClientRect()
+  const W = Math.max(rect.width || 400, 100)
+  const H = Math.max(rect.height || 72, 40)
+  if (canvas.width !== W) canvas.width = W
+  if (canvas.height !== H) canvas.height = H
+  const ctx = canvas.getContext('2d')
+  ctx.clearRect(0, 0, W, H)
+
+  if (hist.length < 2) {
+    ctx.strokeStyle = 'rgba(255,255,255,0.06)'; ctx.lineWidth = 1
+    ctx.beginPath(); ctx.moveTo(0, H * 0.8); ctx.lineTo(W, H * 0.8); ctx.stroke()
+    return
+  }
+
+  const pad = { x: 4, y: 4 }
+  const lo = 0
+  const hi = Math.max(5, Math.max(...hist) * 1.3)
+  const drawW = W - pad.x * 2
+  const drawH = H - pad.y * 2
+  const xStep = drawW / (LATENCY_MAX_POINTS - 1)
+  const yMap = v => pad.y + drawH - (Math.min(v, hi) / hi) * drawH
+  const startX = pad.x + (LATENCY_MAX_POINTS - hist.length) * xStep
+
+  // Grid
+  ctx.strokeStyle = 'rgba(255,255,255,0.04)'; ctx.lineWidth = 1
+  for (let i = 1; i <= 3; i++) {
+    const y = pad.y + (drawH / 4) * i
+    ctx.beginPath(); ctx.moveTo(pad.x, y); ctx.lineTo(pad.x + drawW, y); ctx.stroke()
+  }
+
+  // Parse color for gradient (use accent rgb if available)
+  const rgb = getComputedStyle(document.documentElement).getPropertyValue('--pink-rgb').trim() || '255,46,99'
+  const useRgb = lineColor === 'var(--success)' ? '46,204,113'
+               : lineColor === 'var(--warning)' ? '241,196,15'
+               : lineColor === 'var(--danger)'  ? '231,76,60'
+               : rgb
+
+  // Fill gradient
+  const grad = ctx.createLinearGradient(0, pad.y, 0, pad.y + drawH)
+  grad.addColorStop(0, `rgba(${useRgb},0.2)`)
+  grad.addColorStop(1, `rgba(${useRgb},0)`)
+  ctx.beginPath()
+  ctx.moveTo(startX, pad.y + drawH)
+  hist.forEach((v, i) => ctx.lineTo(startX + i * xStep, yMap(v)))
+  ctx.lineTo(startX + (hist.length - 1) * xStep, pad.y + drawH)
+  ctx.closePath(); ctx.fillStyle = grad; ctx.fill()
+
+  // Line
+  ctx.strokeStyle = `rgba(${useRgb},0.9)`; ctx.lineWidth = 1.5
+  ctx.lineJoin = 'round'; ctx.lineCap = 'round'
+  ctx.shadowColor = `rgba(${useRgb},0.6)`; ctx.shadowBlur = 6
+  ctx.beginPath()
+  hist.forEach((v, i) => {
+    const x = startX + i * xStep, y = yMap(v)
+    i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y)
+  })
+  ctx.stroke()
+  ctx.shadowBlur = 0
+}
+
+// ─── Tweak Profiles ──────────────────────────────────────────────────────────
+function buildTweakProfiles(c) {
+  c.innerHTML = `
+    <div class="section-card">
+      <div class="section-header"><div class="section-accent"></div><div class="section-title">Tweak Profiles</div></div>
+      <div class="section-subtitle">Save your current applied tweaks as a named profile, then load them on any PC or after a reinstall.</div>
+      <div style="padding:12px 18px 14px;display:flex;gap:8px;align-items:center">
+        <input id="profile-name-input" class="profile-name-input" placeholder="Profile name (e.g. Gaming Mode, Work Mode)…" maxlength="48" onkeydown="if(event.key==='Enter')saveCurrentProfile()">
+        <button class="btn btn-primary btn-sm" onclick="saveCurrentProfile()"><i class="fa fa-floppy-disk"></i> Save Current</button>
+      </div>
+    </div>
+    <div class="section-card">
+      <div class="section-header"><div class="section-accent"></div><div class="section-title">Saved Profiles</div></div>
+      <div id="profiles-list" style="padding:4px 0 8px">
+        <div style="padding:20px 18px;text-align:center;color:var(--muted);font-size:11px">Loading…</div>
+      </div>
+    </div>
+  `
+  loadProfilesList()
+}
+
+async function saveCurrentProfile() {
+  const input = document.getElementById('profile-name-input')
+  const name = input?.value.trim()
+  if (!name) { toast('Enter a profile name', '', 'warn'); return }
+
+  // Snapshot all current tweak states
+  const tweaks = {}
+  for (const [k, v] of Object.entries(settings)) {
+    if (k.startsWith('tweak_')) tweaks[k] = v
+  }
+  if (!Object.keys(tweaks).length) { toast('No tweaks applied yet', 'Apply some tweaks first', 'warn'); return }
+
+  await api.saveProfile({ name, tweaks })
+  if (input) input.value = ''
+  toast(`Profile saved`, name, 'ok')
+  loadProfilesList()
+}
+
+async function loadProfilesList() {
+  const list = document.getElementById('profiles-list')
+  if (!list) return
+  const profiles = await api.listProfiles()
+  const entries = Object.values(profiles).sort((a, b) => b.savedAt - a.savedAt)
+  if (!entries.length) {
+    list.innerHTML = '<div style="padding:20px 18px;text-align:center;color:var(--muted);font-size:11px">No profiles saved yet. Apply some tweaks and save a profile above.</div>'
+    return
+  }
+  list.innerHTML = entries.map(p => {
+    const count = Object.keys(p.tweaks).filter(k => p.tweaks[k] === 'applied').length
+    const date = new Date(p.savedAt).toLocaleDateString()
+    return `
+      <div class="profile-row">
+        <div class="profile-row-icon"><i class="fa fa-layer-group"></i></div>
+        <div class="profile-row-info">
+          <div class="profile-row-name">${p.name}</div>
+          <div class="profile-row-meta">${count} tweaks applied · saved ${date}</div>
+        </div>
+        <div style="display:flex;gap:6px;flex-shrink:0">
+          <button class="btn btn-primary btn-sm" onclick="applyProfile(${JSON.stringify(p.name)})"><i class="fa fa-play"></i> Apply</button>
+          <button class="btn btn-ghost btn-sm" onclick="deleteProfile(${JSON.stringify(p.name)})"><i class="fa fa-trash"></i></button>
+        </div>
+      </div>`
+  }).join('')
+}
+
+async function applyProfile(name) {
+  const profile = await api.loadProfile(name)
+  if (!profile) { toast('Profile not found', '', 'warn'); return }
+  const count = Object.keys(profile.tweaks).filter(k => profile.tweaks[k] === 'applied').length
+  try {
+    await showConfirm({
+      title: `Apply Profile: ${name}`,
+      body: `This will apply ${count} tweaks from the "${name}" profile. Tweaks will run one by one.`,
+      okText: 'Apply All', icon: 'fa-layer-group'
+    })
+  } catch { return }
+
+  let done = 0, failed = 0
+  for (const [k, v] of Object.entries(profile.tweaks)) {
+    const id = k.replace(/^tweak_/, '')
+    if (v === 'applied') {
+      const result = await api.runTweak(id, 'apply')
+      if (result.ok) {
+        settings[k] = 'applied'
+        done++
+      } else failed++
+    }
+  }
+  await api.saveSettings(settings)
+  toast(`Profile applied`, `${done} tweaks applied${failed ? `, ${failed} failed` : ''}`, done > 0 ? 'ok' : 'warn')
+}
+
+async function deleteProfile(name) {
+  try {
+    await showConfirm({ title: 'Delete Profile', body: `Delete "${name}"?`, okText: 'Delete', okStyle: 'warning', icon: 'fa-trash' })
+  } catch { return }
+  await api.deleteProfile(name)
+  toast('Profile deleted', name, 'info')
+  loadProfilesList()
+}
+
 // ─── Ripple effect ────────────────────────────────────────────────────────────
 function addRippleToButtons() {
   document.querySelectorAll('.btn:not([data-ripple])').forEach(btn => {
@@ -3617,13 +4041,19 @@ async function applyTweak(id, action = 'apply') {
   const badge = document.getElementById(`badge-${id}`)
   const prog = document.getElementById(`prog-${id}`)
   const progBar = document.getElementById(`prog-bar-${id}`)
+  const applyBtn = document.querySelector(`[data-tweak-apply="${id}"]`)
+  const restoreBtn = document.querySelector(`[data-tweak-restore="${id}"]`)
 
-  if (prog) { prog.classList.add('visible'); }
-  if (progBar) { progBar.classList.add('indeterminate') }
+  if (prog) prog.classList.add('visible')
+  if (progBar) progBar.classList.add('indeterminate')
   if (badge) badge.textContent = action === 'apply' ? 'RUNNING…' : 'RESTORING…'
+  if (applyBtn) { applyBtn.disabled = true; applyBtn.classList.add('btn-running') }
+  if (restoreBtn) { restoreBtn.disabled = true }
 
   const result = await api.runTweak(id, action)
 
+  if (applyBtn) { applyBtn.disabled = false; applyBtn.classList.remove('btn-running') }
+  if (restoreBtn) restoreBtn.disabled = false
   if (progBar) { progBar.classList.remove('indeterminate'); progBar.style.width = '100%' }
   setTimeout(() => { if (prog) prog.classList.remove('visible'); if (progBar) progBar.style.width = '0%' }, 2000)
 
@@ -3635,7 +4065,13 @@ async function applyTweak(id, action = 'apply') {
     settings[`tweak_${id}`] = action === 'apply' ? 'applied' : 'restored'
     await api.saveSettings(settings)
     updateDiscordFps()
-    if (action === 'apply') api.analyticsTweakApplied().catch(() => {})
+    if (action === 'apply') {
+      api.analyticsTweakApplied().catch(() => {})
+      const tweakName = SEARCH_INDEX.find(r => r.id === id)?.label || id
+      showUndoSnackbar(id, tweakName)
+    } else {
+      hideUndoSnackbar()
+    }
   } else {
     if (badge) { badge.innerHTML = '<i class="fa fa-xmark"></i> ERROR'; badge.className = 'tweak-badge' }
   }
@@ -3658,8 +4094,8 @@ function makeRow({ id, name, desc, danger = false, dangerLabel = 'I understand t
     <div class="tweak-right">
       <span class="tweak-badge ${badgeClass(id)}" id="badge-${id}">${badgeText(id)}</span>
       ${danger ? `<label class="danger-toggle"><span><i class="fa fa-triangle-exclamation"></i> ${dangerLabel}</span><label class="toggle-switch"><input type="checkbox" id="tog-${id}"><span class="toggle-slider"></span></label></label>` : ''}
-      <button class="btn btn-primary btn-sm" onclick="${danger ? `applyDanger('${id}')` : `applyTweak('${id}')`}">Apply</button>
-      ${restore ? `<button class="btn btn-ghost btn-sm" onclick="applyTweak('${id}','restore')">Restore</button>` : ''}
+      <button class="btn btn-primary btn-sm" data-tweak-apply="${id}" onclick="${danger ? `applyDanger('${id}')` : `applyTweak('${id}')`}">Apply</button>
+      ${restore ? `<button class="btn btn-ghost btn-sm" data-tweak-restore="${id}" onclick="applyTweak('${id}','restore')">Restore</button>` : ''}
     </div>
     <div class="tweak-progress" id="prog-${id}"><div class="tweak-progress-bar" id="prog-bar-${id}"></div></div>
   `
@@ -4119,7 +4555,28 @@ function buildDashboard(c) {
   const osCaption = si.osCaption || si.os || 'Windows'
   const driverVer = si.gpuDriver || ''
 
-  c.innerHTML = `
+  // Changelog feed — show latest version's items
+  const wn = window._whatsNew?.[0]
+  if (wn && !localStorage.getItem(`wn_dismissed_${wn.version}`)) {
+    const feedEl = document.createElement('div')
+    feedEl.id = 'db-changelog-feed'
+    feedEl.style.cssText = 'margin-bottom:12px;background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius);padding:10px 14px;display:flex;align-items:flex-start;gap:12px'
+    feedEl.innerHTML = `
+      <div style="flex:1;min-width:0">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
+          <span style="font-size:9px;font-weight:800;letter-spacing:1px;text-transform:uppercase;color:var(--pink)">WHAT'S NEW</span>
+          <span style="font-size:9px;font-weight:700;color:var(--muted);background:var(--bg-card2);padding:1px 6px;border-radius:4px;border:1px solid var(--border)">v${wn.version}</span>
+        </div>
+        <div style="display:flex;flex-wrap:wrap;gap:4px">
+          ${wn.items.slice(0,4).map(item => `<span style="font-size:10px;color:var(--gray);background:var(--bg-card2);border:1px solid var(--border);border-radius:5px;padding:2px 8px">${item.split('—')[0].trim()}</span>`).join('')}
+          ${wn.items.length > 4 ? `<span style="font-size:10px;color:var(--muted);padding:2px 4px">+${wn.items.length - 4} more</span>` : ''}
+        </div>
+      </div>
+      <button onclick="localStorage.setItem('wn_dismissed_${wn.version}','1');document.getElementById('db-changelog-feed')?.remove()" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:14px;flex-shrink:0;padding:2px 4px" title="Dismiss">✕</button>`
+    c.appendChild(feedEl)
+  }
+
+  c.innerHTML += `
   <!-- ROW 1: CPU Temp | GPU Temp | Utilization -->
   <div class="db-grid-top">
 
@@ -4279,6 +4736,7 @@ function buildDashboard(c) {
   <div class="quick-actions">
     <button class="btn btn-ghost" onclick="quickFlushDNS()"><i class="fa fa-trash"></i> Flush DNS</button>
     <button class="btn btn-ghost" onclick="quickClearTemp()"><i class="fa fa-broom"></i> Clear Temp</button>
+    <button class="btn btn-ghost" id="btn-ram-clean" onclick="quickCleanRam()"><i class="fa fa-memory"></i> Clean RAM</button>
     <button class="btn btn-ghost" onclick="showPage('fivem')"><i class="fa fa-car-side"></i> FiveM Tweaks</button>
     <button class="btn btn-ghost" onclick="showPage('game-opti')"><i class="fa fa-gamepad"></i> Game Optimizations</button>
     <button class="btn btn-ghost" onclick="refreshSpecs()"><i class="fa fa-arrows-rotate"></i> Refresh Specs</button>
@@ -5084,6 +5542,19 @@ async function quickCreateRP() {
 
 async function quickFlushDNS() { await applyTweak('flush-dns') }
 async function quickClearTemp() { await applyTweak('clean-temp') }
+async function quickCleanRam() {
+  const btn = document.getElementById('btn-ram-clean')
+  if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fa fa-spinner fa-spin"></i> Cleaning…' }
+  const before = sysInfo?.ramGB ? Math.round(sysInfo.ramGB * 1024) : null
+  const res = await api.cleanRam().catch(() => ({ ok: false }))
+  if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fa fa-memory"></i> Clean RAM' }
+  if (res.ok) {
+    const freed = before && res.freeMB ? `${res.freeMB} MB free` : ''
+    toast('RAM Cleaned', freed || 'Standby list cleared', 'ok')
+  } else {
+    toast('RAM Clean Failed', 'Run as Administrator', 'err')
+  }
+}
 
 // ─── Page: Windows Opti ───────────────────────────────────────────────────────
 function buildWindowsOpti(c) {
@@ -5409,6 +5880,62 @@ function buildFiveM(c) {
   c.appendChild(makeTip('Best order: Create RP → Clear Cache → Defender Exclusion → MMCSS → FSO → GPU Settings → Network → Restart FiveM.', 'success'))
   c.appendChild(makeTip('After applying GPU tweaks, reboot your PC for Hardware Scheduling to take effect.', 'warning'))
   c.appendChild(makeTip('CitizenFX.ini tweaks (grass, LOD, worker threads) require a FiveM restart to take effect.', 'warning'))
+
+  // ── Mod Conflict Detector ────────────────────────────────────────────────────
+  const modCard = makeSection('<i class="fa fa-triangle-exclamation"></i> Mod Conflict Detector', 'Scans your GTA V and FiveM folders for mods or ASI plugins that cause crashes, performance issues, or anticheat flags.')
+  const modActions = document.createElement('div')
+  modActions.style.cssText = 'padding:8px 18px 4px;display:flex;gap:8px;align-items:center'
+  modActions.innerHTML = `
+    <button class="btn btn-info btn-sm" id="fivem-mod-scan-btn" onclick="doFivemModScan(this)"><i class="fa fa-magnifying-glass"></i> Scan for Conflicts</button>
+    <span id="fivem-mod-status" style="font-size:10px;color:var(--muted)">Scans FiveM plugin folders and GTA V directory</span>
+  `
+  modCard.appendChild(modActions)
+  const modList = document.createElement('div')
+  modList.id = 'fivem-mod-list'
+  modCard.appendChild(modList)
+  c.appendChild(modCard)
+}
+
+async function doFivemModScan(btn) {
+  btn.disabled = true
+  btn.innerHTML = '<i class="fa fa-spinner fa-spin"></i> Scanning…'
+  const status = document.getElementById('fivem-mod-status')
+  const list = document.getElementById('fivem-mod-list')
+  if (status) status.textContent = 'Scanning…'
+  if (list) list.innerHTML = ''
+
+  const r = await api.fivemScanMods()
+  btn.disabled = false
+  btn.innerHTML = '<i class="fa fa-magnifying-glass"></i> Scan Again'
+
+  if (!r.ok) {
+    if (status) status.textContent = 'Scan failed'
+    return
+  }
+
+  const scannedText = r.scanned.length ? `Scanned ${r.scanned.length} folder(s)` : 'No FiveM/GTA folders found'
+  if (status) status.textContent = r.found.length ? `${r.found.length} issue(s) found · ${scannedText}` : `No conflicts found · ${scannedText}`
+
+  if (!list) return
+
+  if (!r.found.length) {
+    list.innerHTML = '<div style="padding:14px 18px;font-size:11px;color:var(--success)"><i class="fa fa-circle-check"></i> Clean — no conflicting mods or plugins found in scanned locations.</div>'
+    return
+  }
+
+  const sevColor = { high: 'var(--danger)', medium: 'var(--warning)', low: 'var(--muted)' }
+  const sevIcon  = { high: 'fa-circle-xmark', medium: 'fa-triangle-exclamation', low: 'fa-circle-info' }
+  list.innerHTML = r.found.map(item => `
+    <div class="mod-conflict-row">
+      <i class="fa ${sevIcon[item.severity] || 'fa-circle-info'}" style="color:${sevColor[item.severity] || 'var(--muted)'};font-size:13px;flex-shrink:0"></i>
+      <div style="flex:1;min-width:0">
+        <div style="font-size:11px;font-weight:700;color:var(--white)">${item.name} <span style="font-size:9px;color:var(--muted);font-weight:400">· ${item.file}</span></div>
+        <div style="font-size:10px;color:var(--muted);margin-top:2px">${item.reason}</div>
+        <div style="font-size:9px;color:#333;margin-top:1px;font-style:italic">${item.dir}</div>
+      </div>
+      <span class="mod-sev-badge sev-${item.severity}">${item.severity.toUpperCase()}</span>
+    </div>
+  `).join('')
 }
 
 async function doFivemClearCache(btn) {
@@ -5627,9 +6154,16 @@ function renderGPDetail(g) {
       <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px">
         <button class="btn btn-primary btn-sm" onclick="doGPApply('${g.id}','apply')"><i class="fa fa-check"></i> Apply Profile</button>
         <button class="btn btn-ghost btn-sm" onclick="doGPApply('${g.id}','restore')"><i class="fa fa-rotate-left"></i> Restore Defaults</button>
+        ${g.id === 'arma-reforger' ? `<button class="btn btn-info btn-sm" onclick="api.openArmaSettings()"><i class="fa fa-sliders"></i> Graphics Settings</button>` : ''}
       </div>
       ${tip ? `<div class="gp-tip"><i class="fa fa-lightbulb"></i> ${tip}</div>` : ''}
-      <div class="gp-section-lbl" style="margin-top:16px">WHAT THIS APPLIES</div>
+      <div class="gp-section-lbl" style="margin-top:16px">AUTO-PROFILE ON LAUNCH</div>
+      <div style="display:flex;gap:8px;align-items:center;margin-bottom:14px" id="gp-profile-assign-row">
+        <select class="gp-profile-select" id="gp-profile-sel-${g.id}" onchange="assignGameProfile('${g.id}',this.value)">
+          <option value="">— No profile assigned —</option>
+        </select>
+      </div>
+      <div class="gp-section-lbl">WHAT THIS APPLIES</div>
       <div style="font-size:10px;color:var(--gray);line-height:1.9">
         <div><i class="fa fa-bolt"></i> IFEO HIGH CPU + I/O priority for game executables</div>
         <div><i class="fa fa-gamepad"></i> MMCSS: GPU Priority=8, Scheduling=High, Clock=10000</div>
@@ -5639,6 +6173,25 @@ function renderGPDetail(g) {
       </div>
     </div>`
   setTimeout(addRippleToButtons, 50)
+  // Populate per-game profile assignment select
+  populateGameProfileSelect(g.id)
+}
+
+async function populateGameProfileSelect(gameId) {
+  const sel = document.getElementById(`gp-profile-sel-${gameId}`)
+  if (!sel) return
+  const profiles = await api.listProfiles()
+  const assigned = settings[`gameProfile_${gameId}`] || ''
+  const names = Object.keys(profiles).sort()
+  sel.innerHTML = '<option value="">— No profile assigned —</option>' +
+    names.map(n => `<option value="${n}" ${n === assigned ? 'selected' : ''}>${n}</option>`).join('')
+}
+
+async function assignGameProfile(gameId, profileName) {
+  settings[`gameProfile_${gameId}`] = profileName || ''
+  await api.saveSettings(settings)
+  if (profileName) toast('Profile assigned', `"${profileName}" will auto-apply when ${gameId} launches`, 'ok')
+  else toast('Profile removed', `No auto-profile for ${gameId}`, 'info')
 }
 
 async function doGPApply(gameId, action) {

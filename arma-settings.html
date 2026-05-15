@@ -1,0 +1,688 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<link rel="stylesheet" href="assets/fa/css/all.min.css">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline';">
+<title>Arma Reforger Graphics Settings</title>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+  --pink:       #FF2E63;
+  --pink-hover: #E8254F;
+  --pink-dim:   #3a0f1a;
+  --pink-glow:  rgba(255,46,99,0.18);
+  --bg:         #0d0d0d;
+  --bg-card:    #141414;
+  --bg-dark:    #0a0a0a;
+  --border:     #1e1e1e;
+  --border2:    #222;
+  --white:      #f0f0f0;
+  --gray:       #6a6a6a;
+  --muted:      #333333;
+  --success:    #2ECC71;
+  --success-bg: #0a1f12;
+  --warning:    #F39C12;
+  --danger:     #E74C3C;
+  --info:       #3498DB;
+  --orange:     #E67E22;
+  --arma:       #5c8c3e;
+}
+html, body {
+  background: var(--bg);
+  color: var(--white);
+  font-family: 'Segoe UI', system-ui, sans-serif;
+  font-size: 13px;
+  height: 100%;
+  overflow: hidden;
+  user-select: none;
+  -webkit-app-region: no-drag;
+}
+
+/* ── Titlebar ── */
+#titlebar {
+  display: flex; align-items: center;
+  height: 44px;
+  background: var(--bg-dark);
+  border-bottom: 1px solid var(--border);
+  padding: 0 14px;
+  -webkit-app-region: drag;
+  flex-shrink: 0;
+  gap: 10px;
+}
+.tb-icon {
+  width: 28px; height: 28px;
+  border-radius: 8px;
+  background: linear-gradient(135deg, rgba(92,140,62,0.25), rgba(40,60,20,0.5));
+  border: 1px solid rgba(92,140,62,0.4);
+  display: flex; align-items: center; justify-content: center;
+  color: var(--arma); font-size: 13px;
+  flex-shrink: 0;
+}
+.tb-title { flex: 1; font-size: 13px; font-weight: 700; color: var(--white); letter-spacing: 0.02em; }
+.tb-title span { color: var(--arma); }
+.tb-subtitle { font-size: 10px; color: #444; font-weight: 400; margin-top: 1px; }
+.tb-close {
+  -webkit-app-region: no-drag;
+  width: 28px; height: 28px; border-radius: 6px;
+  border: none; background: transparent; color: #555;
+  cursor: pointer; font-size: 14px;
+  display: flex; align-items: center; justify-content: center;
+  transition: background 0.12s, color 0.12s;
+}
+.tb-close:hover { background: var(--danger); color: white; }
+
+/* ── Layout ── */
+#root { display: flex; flex-direction: column; height: 100vh; }
+#content {
+  flex: 1; overflow-y: auto;
+  padding: 16px;
+  display: flex; flex-direction: column; gap: 14px;
+}
+#content::-webkit-scrollbar { width: 4px; }
+#content::-webkit-scrollbar-track { background: transparent; }
+#content::-webkit-scrollbar-thumb { background: #222; border-radius: 2px; }
+
+/* ── Path row ── */
+#path-row { display: flex; gap: 8px; align-items: center; }
+#path-row input {
+  flex: 1; background: var(--bg-card);
+  border: 1px solid var(--border2); border-radius: 7px;
+  padding: 6px 10px; color: var(--white); font-size: 11px; outline: none;
+}
+#path-row input:focus { border-color: rgba(92,140,62,0.5); }
+#path-status { font-size: 10px; color: #444; padding: 2px 0 4px; }
+
+/* ── Buttons ── */
+.btn {
+  display: inline-flex; align-items: center; gap: 6px;
+  border: none; border-radius: 7px;
+  padding: 7px 14px;
+  font-size: 11px; font-weight: 600;
+  cursor: pointer; transition: all 0.12s;
+  white-space: nowrap;
+}
+.btn:disabled { opacity: 0.45; cursor: not-allowed; }
+.btn-primary { background: var(--arma); color: white; }
+.btn-primary:not(:disabled):hover { background: #4a7832; }
+.btn-ghost {
+  background: rgba(255,255,255,0.05);
+  border: 1px solid var(--border2); color: var(--white);
+}
+.btn-ghost:not(:disabled):hover { background: rgba(255,255,255,0.09); }
+
+/* ── Empty / error states ── */
+#empty-state {
+  flex: 1; display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  gap: 12px; color: #333; text-align: center; padding: 40px;
+}
+#empty-state i { font-size: 36px; color: #222; }
+#empty-state p { font-size: 12px; max-width: 320px; line-height: 1.6; }
+#empty-state small { font-size: 10px; color: #2a2a2a; }
+
+/* ── Category group ── */
+.cat-group { background: var(--bg-card); border: 1px solid var(--border); border-radius: 10px; overflow: hidden; }
+.cat-header {
+  display: flex; align-items: center; gap: 8px;
+  padding: 10px 14px;
+  background: rgba(255,255,255,0.02);
+  border-bottom: 1px solid var(--border);
+}
+.cat-icon {
+  width: 24px; height: 24px; border-radius: 6px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 11px; flex-shrink: 0;
+}
+.cat-name { font-size: 12px; font-weight: 700; color: var(--white); }
+.cat-desc { font-size: 10px; color: #444; margin-left: auto; }
+
+/* ── Setting row ── */
+.setting-row {
+  display: grid; grid-template-columns: 1fr 160px 60px;
+  align-items: center; gap: 10px;
+  padding: 10px 14px;
+  border-bottom: 1px solid rgba(255,255,255,0.03);
+  transition: background 0.1s;
+}
+.setting-row:last-child { border-bottom: none; }
+.setting-row:hover { background: rgba(255,255,255,0.02); }
+.setting-row.is-changed { background: rgba(92,140,62,0.06); }
+.setting-label {
+  font-size: 11px; font-weight: 500; color: var(--white);
+  display: flex; flex-direction: column; gap: 2px;
+}
+.setting-label small { font-size: 9px; color: #383838; font-weight: 400; }
+.setting-label .missing-tag {
+  font-size: 9px; color: #5a2a2a;
+  background: rgba(231,76,60,0.1); border: 1px solid rgba(231,76,60,0.2);
+  border-radius: 3px; padding: 1px 5px;
+  display: inline-block; margin-top: 1px;
+}
+.setting-control select {
+  width: 100%; background: #0f0f0f;
+  border: 1px solid #222; border-radius: 6px;
+  padding: 5px 8px; color: var(--white);
+  font-size: 11px; cursor: pointer; outline: none;
+  transition: border-color 0.12s;
+}
+.setting-control select:focus { border-color: rgba(92,140,62,0.5); }
+.setting-control select.is-rec { border-color: rgba(46,204,113,0.35); }
+.impact-pill {
+  display: inline-flex; align-items: center; justify-content: center;
+  border-radius: 20px; padding: 2px 8px;
+  font-size: 9px; font-weight: 700; letter-spacing: 0.04em;
+  text-transform: uppercase; white-space: nowrap;
+}
+.imp-low       { background: rgba(74,222,128,0.1);  color: #4ade80; border: 1px solid rgba(74,222,128,0.25); }
+.imp-medium    { background: rgba(250,204,21,0.1);  color: #facc15; border: 1px solid rgba(250,204,21,0.25); }
+.imp-high      { background: rgba(249,115,22,0.1);  color: #f97316; border: 1px solid rgba(249,115,22,0.25); }
+.imp-very-high { background: rgba(239,68,68,0.12);  color: #ef4444; border: 1px solid rgba(239,68,68,0.3); }
+
+/* ── Footer ── */
+#footer {
+  flex-shrink: 0; display: flex; align-items: center; gap: 8px;
+  padding: 10px 16px;
+  background: var(--bg-dark); border-top: 1px solid var(--border);
+}
+#footer-info { flex: 1; font-size: 10px; color: #383838; line-height: 1.5; }
+#footer-info span { color: #555; }
+#changes-count {
+  font-size: 10px; color: var(--arma);
+  background: rgba(92,140,62,0.12); border: 1px solid rgba(92,140,62,0.3);
+  border-radius: 20px; padding: 2px 9px; font-weight: 600; display: none;
+}
+
+/* ── Preset bar ── */
+#preset-bar { display: none; align-items: center; gap: 8px; }
+.preset-label {
+  font-size: 10px; font-weight: 600; color: #444;
+  text-transform: uppercase; letter-spacing: 0.06em;
+  white-space: nowrap; margin-right: 2px;
+}
+.preset-btn {
+  display: inline-flex; align-items: center; gap: 6px;
+  border-radius: 8px; padding: 7px 14px;
+  font-size: 11px; font-weight: 600;
+  cursor: pointer; transition: all 0.12s;
+  border: 1px solid transparent; white-space: nowrap;
+}
+.preset-btn:hover { transform: translateY(-1px); }
+.preset-quality {
+  background: rgba(52,152,219,0.1); border-color: rgba(52,152,219,0.3); color: #3498DB;
+}
+.preset-quality:hover { background: rgba(52,152,219,0.18); border-color: rgba(52,152,219,0.55); }
+.preset-performance {
+  background: rgba(92,140,62,0.1); border-color: rgba(92,140,62,0.3); color: var(--arma);
+}
+.preset-performance:hover { background: rgba(92,140,62,0.18); border-color: rgba(92,140,62,0.55); }
+.preset-divider { width: 1px; height: 20px; background: #222; margin: 0 2px; }
+
+/* ── Sys info bar ── */
+#sysinfo-bar {
+  display: none; align-items: center; gap: 10px;
+  background: rgba(92,140,62,0.06); border: 1px solid rgba(92,140,62,0.2);
+  border-radius: 8px; padding: 8px 14px; font-size: 10px; color: #6a9a4a;
+}
+#sysinfo-bar i { color: var(--arma); }
+</style>
+</head>
+<body>
+<div id="root">
+  <!-- Titlebar -->
+  <div id="titlebar">
+    <div class="tb-icon"><i class="fa fa-helmet-safety"></i></div>
+    <div style="flex:1">
+      <div class="tb-title">Arma Reforger <span>Graphics</span> Settings</div>
+      <div class="tb-subtitle" id="tb-subtitle">platform.json editor</div>
+    </div>
+    <button class="tb-close" onclick="window.api.closeArmaSettings()"><i class="fa fa-xmark"></i></button>
+  </div>
+
+  <!-- Content -->
+  <div id="content">
+
+    <!-- Sys info bar -->
+    <div id="sysinfo-bar">
+      <i class="fa fa-microchip"></i>
+      <span id="sysinfo-text">Detecting system…</span>
+    </div>
+
+    <!-- Path row -->
+    <div>
+      <div id="path-row">
+        <input id="manual-path" type="text" placeholder="Optional: paste full path to platform.json if auto-detect fails" spellcheck="false">
+        <button class="btn btn-ghost" id="btn-load" onclick="loadSettings()"><i class="fa fa-rotate"></i> Load</button>
+      </div>
+      <div id="path-status"></div>
+    </div>
+
+    <!-- Preset bar -->
+    <div id="preset-bar">
+      <span class="preset-label"><i class="fa fa-wand-magic-sparkles"></i> Presets</span>
+      <div class="preset-divider"></div>
+      <button class="preset-btn preset-quality" onclick="applyPreset('quality')">
+        <i class="fa fa-gem"></i> Quality
+      </button>
+      <button class="preset-btn preset-performance" onclick="applyPreset('performance')">
+        <i class="fa fa-bolt"></i> Performance
+      </button>
+      <div class="preset-divider"></div>
+      <button class="btn btn-ghost" style="font-size:10px;padding:5px 10px;" onclick="applyRecommended()">
+        <i class="fa fa-wand-sparkles"></i> Recommended for my PC
+      </button>
+    </div>
+
+    <!-- Settings body -->
+    <div id="settings-body">
+      <div id="empty-state">
+        <i class="fa fa-helmet-safety"></i>
+        <p>Load your Arma Reforger graphics settings to get started.</p>
+        <small>
+          File: %APPDATA%\ArmaReforger\platform.json<br>
+          If not found, launch Arma Reforger, change any graphics option in-game, then quit fully.
+        </small>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Footer -->
+  <div id="footer">
+    <div id="footer-info">
+      <span id="path-display">No file loaded</span>
+    </div>
+    <span id="changes-count">0 changes</span>
+    <button class="btn btn-primary" id="btn-save" onclick="saveSettings()" disabled>
+      <i class="fa fa-floppy-disk"></i> Save Settings
+    </button>
+  </div>
+</div>
+
+<script>
+// ─── Setting definitions ──────────────────────────────────────────────────────
+// Arma Reforger platform.json uses a JSON structure with nested keys.
+// We flatten them to dot-notation paths for reading/writing.
+const ARMA_SETTINGS_DEFS = [
+  // Rendering
+  { key: 'renderer.renderResolutionScaleMultiplier', label: 'Resolution Scale', desc: 'Internal rendering resolution. 1.0 = native, lower for more FPS.', impact: 'very high',
+    opts: [['0.5','50% — Very Low'],['0.67','67% — Low'],['0.75','75% — Medium'],['0.83','83% — High'],['1.0','100% — Native (Recommended)'],['1.25','125% — Super Resolution']],
+    rec_mid: '0.83', rec_low: '0.75', rec_high: '1.0' },
+  { key: 'renderer.objectLOD', label: 'Object LOD Distance', desc: 'How far away objects display at full detail.', impact: 'high',
+    opts: [['0','Low'],['1','Medium'],['2','High'],['3','Very High']],
+    rec_mid: '1', rec_low: '0', rec_high: '2' },
+  { key: 'renderer.terrainQuality', label: 'Terrain Quality', desc: 'Ground mesh and heightmap detail.', impact: 'high',
+    opts: [['0','Low'],['1','Medium'],['2','High'],['3','Ultra']],
+    rec_mid: '1', rec_low: '1', rec_high: '2' },
+  { key: 'renderer.shadowQuality', label: 'Shadow Quality', desc: 'Shadow map resolution and softness.', impact: 'very high',
+    opts: [['0','Disabled'],['1','Low'],['2','Medium'],['3','High'],['4','Ultra']],
+    rec_mid: '2', rec_low: '1', rec_high: '3' },
+  { key: 'renderer.shadowDistance', label: 'Shadow Draw Distance', desc: 'Range at which shadows are rendered.', impact: 'high',
+    opts: [['0','Low'],['1','Medium'],['2','High'],['3','Very High']],
+    rec_mid: '1', rec_low: '0', rec_high: '2' },
+  { key: 'renderer.shadowCascades', label: 'Shadow Cascades', desc: 'Number of shadow map cascade splits. More = sharper near shadows.', impact: 'medium',
+    opts: [['1','1 — Very Low'],['2','2 — Low'],['3','3 — Medium'],['4','4 — High (Recommended)']],
+    rec_mid: '3', rec_low: '2', rec_high: '4' },
+  // Texture
+  { key: 'renderer.textureQuality', label: 'Texture Quality', desc: 'Base texture resolution for world and objects.', impact: 'medium',
+    opts: [['0','Low'],['1','Medium'],['2','High'],['3','Ultra']],
+    rec_mid: '2', rec_low: '1', rec_high: '3' },
+  { key: 'renderer.textureStreamingQuality', label: 'Texture Streaming', desc: 'Quality of textures streamed from disk at range.', impact: 'medium',
+    opts: [['0','Low'],['1','Medium'],['2','High']],
+    rec_mid: '1', rec_low: '1', rec_high: '2' },
+  { key: 'renderer.anisotropy', label: 'Anisotropic Filtering', desc: 'Sharpens textures at oblique angles — nearly free on modern GPUs.', impact: 'low',
+    opts: [['1','1x — Off'],['2','2x'],['4','4x'],['8','8x'],['16','16x (Recommended)']],
+    rec_mid: '16', rec_low: '16', rec_high: '16' },
+  // Effects & Post
+  { key: 'renderer.ambientOcclusion', label: 'Ambient Occlusion', desc: 'Contact shadows / depth in corners and crevices.', impact: 'medium',
+    opts: [['0','Disabled'],['1','Low (SSAO)'],['2','High (HBAO)']],
+    rec_mid: '1', rec_low: '0', rec_high: '2' },
+  { key: 'renderer.bloomQuality', label: 'Bloom', desc: 'Glow on bright light sources.', impact: 'low',
+    opts: [['0','Disabled'],['1','Low'],['2','High']],
+    rec_mid: '1', rec_low: '0', rec_high: '1' },
+  { key: 'renderer.motionBlur', label: 'Motion Blur', desc: 'Camera and object motion blur. Most players disable this.', impact: 'low',
+    opts: [['0','Disabled (Recommended)'],['1','Low'],['2','High']],
+    rec_mid: '0', rec_low: '0', rec_high: '0' },
+  { key: 'renderer.depthOfField', label: 'Depth of Field', desc: 'Bokeh blur on out-of-focus areas.', impact: 'low',
+    opts: [['0','Disabled (Recommended)'],['1','Low'],['2','High']],
+    rec_mid: '0', rec_low: '0', rec_high: '0' },
+  { key: 'renderer.cloudsQuality', label: 'Clouds Quality', desc: 'Volumetric cloud rendering detail.', impact: 'medium',
+    opts: [['0','Low'],['1','Medium'],['2','High']],
+    rec_mid: '1', rec_low: '0', rec_high: '2' },
+  { key: 'renderer.vegetationQuality', label: 'Vegetation Quality', desc: 'Grass and foliage density and draw distance — major FPS impact.', impact: 'very high',
+    opts: [['0','Low'],['1','Medium'],['2','High'],['3','Ultra']],
+    rec_mid: '1', rec_low: '0', rec_high: '2' },
+  // AA
+  { key: 'renderer.antiAliasing', label: 'Anti-Aliasing', desc: 'Edge smoothing technique.', impact: 'medium',
+    opts: [['0','None'],['1','FXAA'],['2','TAA'],['3','DLSS (if supported)']],
+    rec_mid: '1', rec_low: '1', rec_high: '2' },
+  // Window / Display
+  { key: 'renderer.windowMode', label: 'Window Mode', desc: 'Exclusive fullscreen gives best input latency.', impact: 'high',
+    opts: [['0','Windowed'],['1','Borderless Windowed'],['2','Exclusive Fullscreen (Recommended)']],
+    rec_mid: '2', rec_low: '2', rec_high: '2' },
+  { key: 'renderer.vsync', label: 'V-Sync', desc: 'Syncs FPS to monitor refresh. Disable for lowest input lag.', impact: 'high',
+    opts: [['0','Disabled (Recommended)'],['1','Enabled']],
+    rec_mid: '0', rec_low: '0', rec_high: '0' },
+]
+
+const CATEGORIES = [
+  { id: 'rendering', name: 'Core Rendering', icon: '<i class="fa fa-microchip"></i>', color: '#FF2E63', desc: 'Resolution, LOD & terrain',
+    keys: ['renderer.renderResolutionScaleMultiplier','renderer.objectLOD','renderer.terrainQuality','renderer.windowMode','renderer.vsync'] },
+  { id: 'shadows', name: 'Shadows', icon: '<i class="fa fa-moon"></i>', color: '#9B59B6', desc: 'Shadow maps & cascades',
+    keys: ['renderer.shadowQuality','renderer.shadowDistance','renderer.shadowCascades'] },
+  { id: 'textures', name: 'Textures', icon: '<i class="fa fa-image"></i>', color: '#3498DB', desc: 'Texture resolution & filtering',
+    keys: ['renderer.textureQuality','renderer.textureStreamingQuality','renderer.anisotropy'] },
+  { id: 'environment', name: 'Environment', icon: '<i class="fa fa-tree"></i>', color: '#5c8c3e', desc: 'Vegetation, clouds & world',
+    keys: ['renderer.vegetationQuality','renderer.cloudsQuality'] },
+  { id: 'effects', name: 'Post-Process & Effects', icon: '<i class="fa fa-wand-sparkles"></i>', color: '#F39C12', desc: 'AO, bloom, blur & DoF',
+    keys: ['renderer.ambientOcclusion','renderer.bloomQuality','renderer.antiAliasing','renderer.motionBlur','renderer.depthOfField'] },
+]
+
+const IMPACT_CLASS  = { low: 'imp-low', medium: 'imp-medium', high: 'imp-high', 'very high': 'imp-very-high' }
+const IMPACT_LABEL  = { low: 'Low', medium: 'Med', high: 'High', 'very high': 'Very High' }
+
+const PRESETS = {
+  quality: {
+    'renderer.renderResolutionScaleMultiplier': '1.0',
+    'renderer.objectLOD': '2',
+    'renderer.terrainQuality': '2',
+    'renderer.shadowQuality': '3',
+    'renderer.shadowDistance': '2',
+    'renderer.shadowCascades': '4',
+    'renderer.textureQuality': '3',
+    'renderer.textureStreamingQuality': '2',
+    'renderer.anisotropy': '16',
+    'renderer.ambientOcclusion': '2',
+    'renderer.bloomQuality': '1',
+    'renderer.motionBlur': '0',
+    'renderer.depthOfField': '0',
+    'renderer.cloudsQuality': '2',
+    'renderer.vegetationQuality': '2',
+    'renderer.antiAliasing': '2',
+    'renderer.windowMode': '2',
+    'renderer.vsync': '0',
+  },
+  performance: {
+    'renderer.renderResolutionScaleMultiplier': '0.75',
+    'renderer.objectLOD': '0',
+    'renderer.terrainQuality': '1',
+    'renderer.shadowQuality': '1',
+    'renderer.shadowDistance': '0',
+    'renderer.shadowCascades': '2',
+    'renderer.textureQuality': '1',
+    'renderer.textureStreamingQuality': '1',
+    'renderer.anisotropy': '16',
+    'renderer.ambientOcclusion': '0',
+    'renderer.bloomQuality': '0',
+    'renderer.motionBlur': '0',
+    'renderer.depthOfField': '0',
+    'renderer.cloudsQuality': '0',
+    'renderer.vegetationQuality': '0',
+    'renderer.antiAliasing': '1',
+    'renderer.windowMode': '2',
+    'renderer.vsync': '0',
+  },
+}
+
+let currentVals = {}
+let currentPath = ''
+let sysInfo = null
+
+function getManualPath() {
+  return (document.getElementById('manual-path')?.value || '').trim() || undefined
+}
+
+// Determine which tier the system falls into based on GPU VRAM + CPU
+function getSystemTier() {
+  if (!sysInfo) return 'mid'
+  const vram = sysInfo.vramMB || 0
+  const cores = sysInfo.cpuCores || 4
+  if (vram >= 8192 && cores >= 8) return 'high'
+  if (vram >= 4096 && cores >= 6) return 'mid'
+  return 'low'
+}
+
+function getRec(def) {
+  const tier = getSystemTier()
+  if (tier === 'high') return def.rec_high
+  if (tier === 'low')  return def.rec_low
+  return def.rec_mid
+}
+
+async function loadSettings() {
+  const btn = document.getElementById('btn-load')
+  const body = document.getElementById('settings-body')
+  const pathStatus = document.getElementById('path-status')
+
+  btn.disabled = true
+  btn.innerHTML = '<i class="fa fa-spinner fa-spin"></i> Loading…'
+  body.innerHTML = `<div id="empty-state"><i class="fa fa-spinner fa-spin" style="font-size:28px;color:#333"></i><p style="color:#333">Reading settings file…</p></div>`
+
+  const r = await window.api.armaReadSettings(getManualPath())
+  btn.disabled = false
+  btn.innerHTML = '<i class="fa fa-rotate"></i> Load'
+
+  if (!r.ok) {
+    pathStatus.innerHTML = `<i class="fa fa-triangle-exclamation" style="color:#E74C3C"></i> ${r.reason}`
+    body.innerHTML = `<div id="empty-state">
+      <i class="fa fa-triangle-exclamation" style="color:#E74C3C;font-size:32px"></i>
+      <p style="color:#555">${r.reason}</p>
+      ${r.hint ? `<small>${r.hint}</small>` : ''}
+    </div>`
+    return
+  }
+
+  currentVals = r.vals
+  currentPath = r.path
+  pathStatus.innerHTML = `<i class="fa fa-check" style="color:#2ECC71"></i> ${r.path}`
+  document.getElementById('path-display').textContent = r.path
+  document.getElementById('btn-save').disabled = false
+  document.getElementById('preset-bar').style.display = 'flex'
+
+  renderSettings()
+  trackChanges()
+}
+
+function renderSettings() {
+  const body = document.getElementById('settings-body')
+  body.innerHTML = ''
+
+  const defMap = {}
+  for (const d of ARMA_SETTINGS_DEFS) defMap[d.key] = d
+
+  for (const cat of CATEGORIES) {
+    const catDefs = cat.keys.map(k => defMap[k]).filter(Boolean)
+    if (!catDefs.length) continue
+
+    const group = document.createElement('div')
+    group.className = 'cat-group'
+
+    const header = document.createElement('div')
+    header.className = 'cat-header'
+    header.innerHTML = `
+      <div class="cat-icon" style="background:${cat.color}18;border:1px solid ${cat.color}33;color:${cat.color}">${cat.icon}</div>
+      <div class="cat-name">${cat.name}</div>
+      <div class="cat-desc">${cat.desc}</div>
+    `
+    group.appendChild(header)
+
+    for (const def of catDefs) {
+      const rec   = getRec(def)
+      const curVal = currentVals[def.key]
+      const isRec  = curVal != null && String(curVal) === String(rec)
+      const isMissing = curVal == null
+      const displayVal = curVal != null ? curVal : rec
+
+      const row = document.createElement('div')
+      row.className = 'setting-row'
+      row.id = `srow-${def.key.replace(/\./g, '_')}`
+
+      let optionsHtml = ''
+      for (const [v, label] of def.opts) {
+        const isRec2 = String(v) === String(rec)
+        const sel = String(v) === String(displayVal) ? 'selected' : ''
+        optionsHtml += `<option value="${v}" ${sel}>${label}${isRec2 ? ' ★' : ''}</option>`
+      }
+
+      row.innerHTML = `
+        <div class="setting-label">
+          ${def.label}
+          <small>${def.desc}</small>
+          ${isMissing ? '<span class="missing-tag"><i class="fa fa-circle-exclamation"></i> not in file — will be added on save</span>' : ''}
+        </div>
+        <div class="setting-control">
+          <select id="sval-${def.key.replace(/\./g,'_')}" data-key="${def.key}" onchange="onSettingChange('${def.key}')" class="${isRec ? 'is-rec' : ''}">
+            ${optionsHtml}
+          </select>
+        </div>
+        <div><span class="impact-pill ${IMPACT_CLASS[def.impact] || 'imp-low'}">${IMPACT_LABEL[def.impact] || def.impact}</span></div>
+      `
+      group.appendChild(row)
+    }
+
+    body.appendChild(group)
+  }
+}
+
+function onSettingChange(key) {
+  const safeKey = key.replace(/\./g, '_')
+  const el = document.getElementById(`sval-${safeKey}`)
+  const def = ARMA_SETTINGS_DEFS.find(d => d.key === key)
+  if (!def || !el) return
+
+  const isRec = String(el.value) === String(getRec(def))
+  el.classList.toggle('is-rec', isRec)
+
+  const origVal = currentVals[key]
+  const isChanged = origVal != null && String(el.value) !== String(origVal)
+  document.getElementById(`srow-${safeKey}`)?.classList.toggle('is-changed', isChanged)
+
+  trackChanges()
+}
+
+function trackChanges() {
+  let count = 0
+  for (const def of ARMA_SETTINGS_DEFS) {
+    const el = document.getElementById(`sval-${def.key.replace(/\./g,'_')}`)
+    if (!el) continue
+    const orig = currentVals[def.key]
+    if (orig != null && String(el.value) !== String(orig)) count++
+  }
+  const badge = document.getElementById('changes-count')
+  if (count > 0) {
+    badge.style.display = 'inline-block'
+    badge.textContent = `${count} change${count !== 1 ? 's' : ''}`
+  } else {
+    badge.style.display = 'none'
+  }
+}
+
+function applyPreset(presetId) {
+  const values = PRESETS[presetId]
+  if (!values || !Object.keys(currentVals).length) return
+  for (const def of ARMA_SETTINGS_DEFS) {
+    const el = document.getElementById(`sval-${def.key.replace(/\./g,'_')}`)
+    if (!el) continue
+    if (values[def.key] !== undefined) {
+      el.value = values[def.key]
+      onSettingChange(def.key)
+    }
+  }
+  const btn = document.querySelector(`.preset-${presetId}`)
+  if (btn) {
+    const orig = btn.innerHTML
+    btn.innerHTML = '<i class="fa fa-check"></i> Applied'
+    btn.style.opacity = '0.7'
+    setTimeout(() => { btn.innerHTML = orig; btn.style.opacity = '' }, 1800)
+  }
+}
+
+function applyRecommended() {
+  if (!Object.keys(currentVals).length) return
+  for (const def of ARMA_SETTINGS_DEFS) {
+    const el = document.getElementById(`sval-${def.key.replace(/\./g,'_')}`)
+    if (!el) continue
+    el.value = getRec(def)
+    onSettingChange(def.key)
+  }
+  const btn = document.querySelector('.btn-ghost[onclick="applyRecommended()"]')
+  if (btn) {
+    const orig = btn.innerHTML
+    btn.innerHTML = '<i class="fa fa-check"></i> Applied!'
+    setTimeout(() => { btn.innerHTML = orig }, 1800)
+  }
+}
+
+async function saveSettings() {
+  const btn = document.getElementById('btn-save')
+
+  const changes = {}
+  for (const def of ARMA_SETTINGS_DEFS) {
+    const el = document.getElementById(`sval-${def.key.replace(/\./g,'_')}`)
+    if (el) changes[def.key] = el.value
+  }
+
+  btn.disabled = true
+  btn.innerHTML = '<i class="fa fa-spinner fa-spin"></i> Saving…'
+
+  const r = await window.api.armaWriteSettings(changes, getManualPath())
+  btn.disabled = false
+
+  if (r.ok) {
+    btn.innerHTML = '<i class="fa fa-check"></i> Saved!'
+    document.getElementById('path-status').innerHTML =
+      `<i class="fa fa-check" style="color:#2ECC71"></i> Saved → ${r.path}`
+    showSaveBanner()
+    for (const def of ARMA_SETTINGS_DEFS) {
+      const el = document.getElementById(`sval-${def.key.replace(/\./g,'_')}`)
+      if (el) currentVals[def.key] = el.value
+    }
+    for (const def of ARMA_SETTINGS_DEFS)
+      document.getElementById(`srow-${def.key.replace(/\./g,'_')}`)?.classList.remove('is-changed')
+    trackChanges()
+    setTimeout(() => { btn.innerHTML = '<i class="fa fa-floppy-disk"></i> Save Settings'; btn.disabled = false }, 2500)
+  } else {
+    btn.innerHTML = '<i class="fa fa-xmark"></i> Error'
+    document.getElementById('path-status').innerHTML =
+      `<i class="fa fa-triangle-exclamation" style="color:#E74C3C"></i> ${r.reason || 'Save failed'}`
+    setTimeout(() => { btn.innerHTML = '<i class="fa fa-floppy-disk"></i> Save Settings'; btn.disabled = false }, 2500)
+  }
+}
+
+function showSaveBanner() {
+  const existing = document.getElementById('save-confirm-banner')
+  if (existing) existing.remove()
+  const banner = document.createElement('div')
+  banner.id = 'save-confirm-banner'
+  banner.style.cssText = 'background:rgba(46,204,113,0.08);border:1px solid rgba(46,204,113,0.25);border-radius:8px;padding:10px 14px;display:flex;align-items:center;gap:10px;font-size:11px;color:#c0c0cc'
+  banner.innerHTML = `
+    <i class="fa fa-circle-check" style="color:#2ECC71;font-size:14px;flex-shrink:0"></i>
+    <div style="flex:1;line-height:1.5">
+      <strong style="color:#2ECC71">Settings saved.</strong><br>
+      <span style="color:#8a8a9a">Make sure Arma Reforger is fully closed before saving. Relaunch the game for changes to take effect.</span>
+    </div>
+    <button onclick="this.closest('#save-confirm-banner').remove()" style="background:none;border:none;color:#555;cursor:pointer;font-size:13px;flex-shrink:0;padding:0 4px">✕</button>
+  `
+  document.getElementById('content').insertBefore(banner, document.getElementById('settings-body'))
+}
+
+window.addEventListener('DOMContentLoaded', async () => {
+  // Show system info
+  try {
+    sysInfo = await window.api.getSystemInfo()
+    if (sysInfo) {
+      const tier = getSystemTier()
+      const tierLabel = tier === 'high' ? 'High-End' : tier === 'mid' ? 'Mid-Range' : 'Budget'
+      const tierColor = tier === 'high' ? '#2ECC71' : tier === 'mid' ? '#F39C12' : '#E74C3C'
+      const vramGB = sysInfo.vramMB >= 1024 ? `${Math.round(sysInfo.vramMB/1024)}GB VRAM` : `${sysInfo.vramMB}MB VRAM`
+      document.getElementById('sysinfo-bar').style.display = 'flex'
+      document.getElementById('sysinfo-text').innerHTML =
+        `Detected: <strong style="color:#aaa">${sysInfo.cpu || 'Unknown CPU'}</strong> · <strong style="color:#aaa">${sysInfo.gpu || 'Unknown GPU'}</strong> (${vramGB}) · ` +
+        `System tier: <strong style="color:${tierColor}">${tierLabel}</strong> · ★ markers show recommended settings for your PC`
+    }
+  } catch {}
+  loadSettings()
+})
+</script>
+</body>
+</html>
