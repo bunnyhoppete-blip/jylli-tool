@@ -1548,11 +1548,12 @@ select.styled-select:focus { border-color: var(--pink); }
   <div style="background:#111;border:1px solid var(--pink);border-radius:14px;padding:28px 32px;width:460px;max-width:92vw;box-shadow:0 24px 60px rgba(0,0,0,0.9);animation:cardIn .3s ease">
     <div style="font-size:16px;font-weight:700;color:var(--white);margin-bottom:6px"><i class="fa fa-gear" style="color:var(--pink)"></i> Advanced Mode</div>
     <div style="font-size:11px;color:var(--gray);margin-bottom:18px;line-height:1.7">
-      Advanced mode unlocks extra tools hidden by default. These are for experienced users — use carefully.<br><br>
+      Advanced mode unlocks extra tools hidden by default.<br><br>
       <span style="color:var(--white);font-weight:600">Process Manager</span> <span style="color:#555">—</span> view and terminate running processes<br>
       <span style="color:var(--white);font-weight:600">Latency Monitor</span> <span style="color:#555">—</span> live DPC/ISR latency chart<br>
       <span style="color:var(--white);font-weight:600">Ping Test</span> <span style="color:#555">—</span> test latency to game servers worldwide<br>
-      <span style="color:var(--white);font-weight:600">BIOS Tuner</span> <span style="color:#555">—</span> read and modify BIOS/UEFI settings from Windows
+      <span style="color:var(--white);font-weight:600">BIOS Tuner</span> <span style="color:#555">—</span> read and write BIOS/UEFI settings directly from Windows<br><br>
+      <span style="color:var(--warning)"><i class="fa fa-triangle-exclamation"></i> BIOS Tuner is the only tool here that requires care — incorrect settings can prevent your PC from booting.</span>
     </div>
     <button class="btn btn-primary" style="width:100%" onclick="document.getElementById('advanced-intro-overlay').style.display='none'">Got it</button>
   </div>
