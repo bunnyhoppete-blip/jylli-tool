@@ -1312,7 +1312,11 @@ ipcMain.handle('run-tweak', async (_, { id, action }) => {
 
 // ─── Real-time metrics ────────────────────────────────────────────────────────
 let _netPrevBytes = null
+let _lastMetrics = null
 ipcMain.handle('get-metrics', async () => {
+  // Don't spawn PowerShell while a game is running — return last known values instead
+  if (activeGameProfile && _lastMetrics) return _lastMetrics
+
   const metrics = {
     cpu: 0, ram: 0, ramUsed: 0, ramTotal: 0,
     disk: 0, diskUsed: 0, diskTotal: 0,
@@ -1446,6 +1450,7 @@ Write-Output "GPU_LOAD=$([int][math]::Min(100,[math]::Max(0,$g)))"
     } catch {}
   }
 
+  _lastMetrics = metrics
   return metrics
 })
 

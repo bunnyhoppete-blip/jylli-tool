@@ -2127,9 +2127,13 @@ async function init() {
     } else if (event === 'game-started') {
       const lbl = document.getElementById('watcher-active-game')
       if (lbl) lbl.textContent = `▶ ${gameId} running — optimizations applied`
+      // Pause metrics polling while game is running — prevents PowerShell spawns every 3s
+      if (metricsInterval) { clearInterval(metricsInterval); metricsInterval = null }
     } else if (event === 'game-closed') {
       const lbl = document.getElementById('watcher-active-game')
       if (lbl) lbl.textContent = 'Watching for: Fortnite, GTA V, Valorant, CS2, Apex, Warzone, Rust, THE FINALS, Arma Reforger'
+      // Resume metrics polling when game closes
+      if (!metricsInterval) { metricsInterval = setInterval(updateMetrics, 3000) }
     }
   })
 
@@ -3668,6 +3672,11 @@ async function doDeleteTask(name) {
 // ─── Page: Changelog ──────────────────────────────────────────────────────────
 // ─── Page: Fixes ──────────────────────────────────────────────────────────────
 const FIXES_DEFS = [
+  {
+    id: 'fix-fullscreen-flicker', name: 'Fullscreen Flicker Fix', icon: '<i class="fa fa-display" style="color:#a78bfa"></i>',
+    desc: 'Minimizes Jylli Tool to tray while you game. The app polls system metrics every 3 seconds while open — hiding it to tray stops all background activity and eliminates fullscreen focus interference.',
+    handler: async (s) => { await api.minimize() }
+  },
   {
     id: 'fix-valorant-cfg', name: 'Valorant Fix CFG', icon: '<i class="fa fa-shield-halved" style="color:#ff4655"></i>',
     desc: 'Enables Control Flow Guard (CFG) and related mitigations for Valorant/Vanguard',
