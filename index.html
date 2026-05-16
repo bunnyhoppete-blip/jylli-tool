@@ -2238,6 +2238,8 @@ async function init() {
     syncPulseUIState()
     toast(active ? `Pulse activated` : 'Pulse stopped', active ? `Activated from tray (${presetId})` : 'Deactivated from tray', active ? 'ok' : 'info')
   })
+
+  setTimeout(autoHealthCheck, 3000)
 }
 
 function updateAdminBadge(isAdmin) {
@@ -2842,6 +2844,35 @@ async function reapplyReverted(ids) {
   toast(`Re-applied ${ids.length} tweak(s)`, '', 'ok')
   const healthEl = document.getElementById('settings-health-result')
   if (healthEl) healthEl.innerHTML = `<span style="color:var(--ok)">✓ ${ids.length} tweak(s) re-applied</span>`
+}
+
+async function doCleanPowerPlans(btn) {
+  btn.disabled = true
+  btn.innerHTML = '<i class="fa fa-rotate fa-spin"></i> Cleaning…'
+  const r = await api.cleanPowerPlans().catch(() => ({ ok: false }))
+  btn.disabled = false
+  btn.innerHTML = '<i class="fa fa-trash-can"></i> Clean up old power plans'
+  if (r.ok) toast(r.deleted > 0 ? `Removed ${r.deleted} old power plan(s)` : 'No old plans to remove', 'Balanced plan is now active', r.deleted > 0 ? 'ok' : 'info')
+  else toast('Could not clean power plans', '', 'err')
+}
+
+async function autoHealthCheck() {
+  try {
+    const result = await api.runTweakHealth()
+    if (!result || result.reverted.length === 0) return
+    const names = result.reverted.map(id => {
+      const tw = SEARCH_INDEX?.find?.(t => t.id === id)
+      return tw?.name || id
+    })
+    const confirmed = await showConfirm({
+      title: `${result.reverted.length} tweak${result.reverted.length > 1 ? 's' : ''} reverted by Windows`,
+      body: `Windows reset the following tweak${result.reverted.length > 1 ? 's' : ''} since your last session:<br><br><b>${names.join('<br>')}</b><br><br>Re-apply them now?`,
+      okText: 'Re-apply',
+      okStyle: 'warning',
+      icon: 'fa-rotate-left'
+    }).catch(() => null)
+    if (confirmed !== null) await reapplyReverted(result.reverted)
+  } catch {}
 }
 
 function shadeColor(hex, pct) {
@@ -7438,6 +7469,16 @@ function buildHardware(c) {
     card.appendChild(grid)
     c.appendChild(card)
   })
+
+  // Inject "Clean up old power plans" button into whichever power plan card is present
+  for (const cardId of ['tcw-amd-power-plan', 'tcw-intel-power-plan']) {
+    const pc = document.getElementById(cardId)
+    if (!pc) continue
+    const row = document.createElement('div')
+    row.style.cssText = 'padding:0 14px 12px;margin-top:-4px'
+    row.innerHTML = `<button class="btn btn-ghost btn-sm" style="font-size:10px;gap:5px;color:var(--muted)" onclick="doCleanPowerPlans(this)"><i class="fa fa-trash-can"></i> Clean up old power plans</button>`
+    pc.appendChild(row)
+  }
 }
 
 // ─── Page: Network ────────────────────────────────────────────────────────────

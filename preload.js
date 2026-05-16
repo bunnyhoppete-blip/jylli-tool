@@ -115,4 +115,5 @@ contextBridge.exposeInMainWorld('api', {
   cpuzReadTimings:    ()            => ipcRenderer.invoke('cpuz-read-timings'),
   getDriverInfo:      ()            => ipcRenderer.invoke('get-driver-info'),
   runBenchmark:       ()            => ipcRenderer.invoke('run-benchmark'),
+  cleanPowerPlans:    ()            => ipcRenderer.invoke('clean-power-plans'),
 })

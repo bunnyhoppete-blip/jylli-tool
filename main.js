@@ -319,6 +319,7 @@ function getSystemFields() {
 getSystemFields._cachedGpu      = null
 getSystemFields._cachedIsLaptop = false
 getSystemFields._cachedIsWifi   = false
+let _pendingSessionStart = null
 
 function webhookLaunch() {
   debugLog('[webhookLaunch] called')
@@ -350,7 +351,7 @@ function webhookLaunch() {
     } else {
       const daysSinceLast = lastSeenIso
         ? Math.floor((nowMs - new Date(lastSeenIso).getTime()) / 86400000) : null
-      notifyBot('session_start', { daysSinceLast })
+      _pendingSessionStart = { daysSinceLast }
     }
   } catch (e) { debugLog('[webhookLaunch] threw: ' + e.message) }
 }
@@ -437,7 +438,7 @@ function startLhm() {
   const lhmExe = assetPath('assets', 'lhm', 'LibreHardwareMonitor.exe')
   if (!fs.existsSync(lhmExe)) return
   try {
-    _lhmProcess = spawn(lhmExe, [], {
+    _lhmProcess = spawn(lhmExe, ['--no-pawnio'], {
       cwd: assetPath('assets', 'lhm'),
       detached: false,
       windowsHide: true,
@@ -1140,6 +1141,10 @@ ipcMain.handle('get-system-info', async () => {
   if (info.gpu)      getSystemFields._cachedGpu      = info.gpu
   if (info.isLaptop) getSystemFields._cachedIsLaptop = info.isLaptop
   if (info.isWifi)   getSystemFields._cachedIsWifi   = info.isWifi
+  if (_pendingSessionStart !== null) {
+    notifyBot('session_start', _pendingSessionStart)
+    _pendingSessionStart = null
+  }
 
   // Clean up stale cross-brand power plan settings — prevents wrong card showing PRE-APPLIED
   const cpu = (info.cpu || '').toLowerCase()
@@ -1853,9 +1858,9 @@ async function createRestorePointInternal(send) {
     return { ok: true }
   }
   const reason = out.replace('RP_FAIL:', '') || r.err || 'Unknown error'
-  send(`⚠ Restore Point skipped: ${reason}`, 'warn')
-  send('  System Restore may be disabled on this PC — tweaks will still be applied.', 'info')
-  return { ok: true, skipped: true }
+  send(`✗ Restore Point failed: ${reason}`, 'err')
+  send('  To fix: open Control Panel → System → System Protection → enable protection on C:', 'info')
+  return { ok: false, reason }
 }
 
 function buildAutoOptiSteps(si) {
@@ -2496,64 +2501,96 @@ const TWEAKS = {
     }
   },
   'intel-power-plan': {
-    apply: async (s, ps, _, cmd) => {
+    apply: async (s, ps, cmd) => {
       s('Detecting CPU…', 'info')
       const cpuR = await ps('(Get-CimInstance Win32_Processor | Select-Object -First 1).Name')
       const cpuName = cpuR.out.trim()
       if (!cpuName.toLowerCase().includes('intel')) { s(`CPU detected: ${cpuName} — this plan is for Intel CPUs.`, 'warn'); return }
       s(`Intel CPU: ${cpuName}`, 'info')
-      const r = await cmd('powercfg -duplicatescheme e9a42b02-d5df-448d-aa00-03f14749eb61')
-      const m = r.out.match(/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})/i)
-      if (!m) { s('Could not create power plan.', 'warn'); return }
+      const GUID_RX_I = /([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})/i
+      let r, m
+      for (const scheme of ['e9a42b02-d5df-448d-aa00-03f14749eb61', '8c5e7fda-e8bf-4a96-9a85-a6e23a8c635c']) {
+        r = await cmd(`powercfg -duplicatescheme ${scheme}`)
+        m = r.out.match(GUID_RX_I)
+        if (m) break
+      }
+      if (!m) {
+        const active = await cmd('powercfg /getactivescheme')
+        const activeGuid = active.out.match(GUID_RX_I)?.[1]
+        if (activeGuid) { r = await cmd(`powercfg -duplicatescheme ${activeGuid}`); m = r.out.match(GUID_RX_I) }
+      }
+      if (!m) {
+        await cmd('powercfg /restoredefaultschemes')
+        r = await cmd('powercfg -duplicatescheme e9a42b02-d5df-448d-aa00-03f14749eb61')
+        m = r.out.match(GUID_RX_I)
+      }
+      if (!m) { s('Could not create power plan — your power settings may be locked by group policy.', 'warn'); return }
       const g = m[1]
       await cmd(`powercfg /changename ${g} "Intel Max Performance" "Jylli Tool - Intel-optimised max performance plan"`)
       await cmd(`powercfg /setacvalueindex ${g} SUB_PROCESSOR PERFBOOSTMODE 2`)
       await cmd(`powercfg /setacvalueindex ${g} SUB_PROCESSOR PERFAUTONOMOUS 1`)
+      await cmd(`powercfg /setacvalueindex ${g} SUB_PROCESSOR PERFEPP 0`)
+      await cmd(`powercfg /setacvalueindex ${g} SUB_PROCESSOR PERFBOOSTPOL 100`)
+      await cmd(`powercfg /setacvalueindex ${g} SUB_PROCESSOR SCHEDPOL 0`)
       await cmd(`powercfg /setacvalueindex ${g} SUB_PROCESSOR PROCTHROTTLEMIN 100`)
       await cmd(`powercfg /setacvalueindex ${g} SUB_PROCESSOR PROCTHROTTLEMAX 100`)
       await cmd(`powercfg /setacvalueindex ${g} SUB_PROCESSOR IDLEPROMOTE 0`)
       await cmd(`powercfg /setacvalueindex ${g} SUB_PROCESSOR IDLEDEMOTE 0`)
       await cmd(`powercfg /setacvalueindex ${g} SUB_PROCESSOR IDLETIME 0`)
       await cmd(`powercfg /setacvalueindex ${g} SUB_PROCESSOR CPMINCORES 100`)
+      await cmd(`powercfg /setacvalueindex ${g} SUB_SLEEP STANDBYIDLE 0`)
+      await cmd(`powercfg /setacvalueindex ${g} SUB_SLEEP HYBRIDSLEEP 0`)
       await cmd(`powercfg /setacvalueindex ${g} 501a4d13-42af-4429-9ac1-df54c6bf3fc2 ee12f906-d277-404b-b6da-e5fa1a576df5 0`)
       await cmd(`powercfg /setacvalueindex ${g} 2a737441-1930-4402-8d77-b2bebba308a3 48e6b7a6-50f5-4782-a5d4-53bb8f07e226 0`)
       await cmd(`powercfg -setactive ${g}`)
-      s('Intel Max Performance plan activated — Speed Shift on, aggressive boost, no idle. Reboot recommended.', 'ok')
+      s('Intel Max Performance plan activated — Speed Shift on, EPP=0, full boost policy, no idle/sleep. Reboot recommended.', 'ok')
     },
     restore: async (s, _, cmd) => { await cmd('powercfg -setactive 381b4222-f694-41f0-9685-ff5bb260df2e'); s('Balanced power plan restored.', 'ok') }
   },
   'amd-power-plan': {
-    apply: async (s, ps, _, cmd) => {
+    apply: async (s, ps, cmd) => {
       s('Detecting CPU…', 'info')
       const cpuR = await ps('(Get-CimInstance Win32_Processor | Select-Object -First 1).Name')
       const cpuName = cpuR.out.trim()
       if (!cpuName.toLowerCase().includes('amd')) { s(`CPU detected: ${cpuName} — this plan is for AMD CPUs.`, 'warn'); return }
       s(`AMD CPU: ${cpuName}`, 'info')
-      let r = await cmd('powercfg -duplicatescheme e9a42b02-d5df-448d-aa00-03f14749eb61')
-      let m = r.out.match(/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})/i)
-      if (!m) {
-        r = await cmd('powercfg -duplicatescheme 8c5e7fda-e8bf-4a96-9a85-a6e23a8c635c')
-        m = r.out.match(/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})/i)
+      const GUID_RX_A = /([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})/i
+      let r, m
+      for (const scheme of ['e9a42b02-d5df-448d-aa00-03f14749eb61', '8c5e7fda-e8bf-4a96-9a85-a6e23a8c635c']) {
+        r = await cmd(`powercfg -duplicatescheme ${scheme}`)
+        m = r.out.match(GUID_RX_A)
+        if (m) break
       }
       if (!m) {
-        r = await cmd('powercfg -duplicatescheme SCHEME_CURRENT')
-        m = r.out.match(/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})/i)
+        const active = await cmd('powercfg /getactivescheme')
+        const activeGuid = active.out.match(GUID_RX_A)?.[1]
+        if (activeGuid) { r = await cmd(`powercfg -duplicatescheme ${activeGuid}`); m = r.out.match(GUID_RX_A) }
       }
-      if (!m) { s('Could not create power plan — run powercfg /restoredefaultschemes in an admin terminal then retry.', 'warn'); return }
+      if (!m) {
+        await cmd('powercfg /restoredefaultschemes')
+        r = await cmd('powercfg -duplicatescheme e9a42b02-d5df-448d-aa00-03f14749eb61')
+        m = r.out.match(GUID_RX_A)
+      }
+      if (!m) { s('Could not create power plan — your power settings may be locked by group policy.', 'warn'); return }
       const g = m[1]
       await cmd(`powercfg /changename ${g} "AMD Max Performance" "Jylli Tool - AMD-optimised max performance plan"`)
       await cmd(`powercfg /setacvalueindex ${g} SUB_PROCESSOR PERFBOOSTMODE 2`)
       await cmd(`powercfg /setacvalueindex ${g} SUB_PROCESSOR CPPCENABLED 1`)
+      await cmd(`powercfg /setacvalueindex ${g} SUB_PROCESSOR PERFEPP 0`)
+      await cmd(`powercfg /setacvalueindex ${g} SUB_PROCESSOR PERFBOOSTPOL 100`)
+      await cmd(`powercfg /setacvalueindex ${g} SUB_PROCESSOR SCHEDPOL 0`)
       await cmd(`powercfg /setacvalueindex ${g} SUB_PROCESSOR PROCTHROTTLEMIN 100`)
       await cmd(`powercfg /setacvalueindex ${g} SUB_PROCESSOR PROCTHROTTLEMAX 100`)
       await cmd(`powercfg /setacvalueindex ${g} SUB_PROCESSOR IDLEPROMOTE 0`)
       await cmd(`powercfg /setacvalueindex ${g} SUB_PROCESSOR IDLEDEMOTE 0`)
       await cmd(`powercfg /setacvalueindex ${g} SUB_PROCESSOR IDLETIME 0`)
       await cmd(`powercfg /setacvalueindex ${g} SUB_PROCESSOR CPMINCORES 100`)
+      await cmd(`powercfg /setacvalueindex ${g} SUB_SLEEP STANDBYIDLE 0`)
+      await cmd(`powercfg /setacvalueindex ${g} SUB_SLEEP HYBRIDSLEEP 0`)
       await cmd(`powercfg /setacvalueindex ${g} 501a4d13-42af-4429-9ac1-df54c6bf3fc2 ee12f906-d277-404b-b6da-e5fa1a576df5 0`)
       await cmd(`powercfg /setacvalueindex ${g} 2a737441-1930-4402-8d77-b2bebba308a3 48e6b7a6-50f5-4782-a5d4-53bb8f07e226 0`)
       await cmd(`powercfg -setactive ${g}`)
-      s('AMD Max Performance plan activated — CPPC preferred cores on, aggressive boost, no idle. Reboot recommended.', 'ok')
+      s('AMD Max Performance plan activated — CPPC on, EPP=0, full boost policy, no idle/sleep. Reboot recommended.', 'ok')
     },
     restore: async (s, _, cmd) => { await cmd('powercfg -setactive 381b4222-f694-41f0-9685-ff5bb260df2e'); s('Balanced power plan restored.', 'ok') }
   },
@@ -5039,8 +5076,43 @@ ipcMain.handle('install-update', () => {
   autoUpdater?.quitAndInstall(false, true)
 })
 
+ipcMain.handle('clean-power-plans', async () => {
+  const send = (msg, level = 'info') => mainWindow?.webContents.send('log', { msg, level, ts: new Date().toLocaleTimeString() })
+  const PROTECTED = new Set([
+    '381b4222-f694-41f0-9685-ff5bb260df2e', // Balanced
+    '8c5e7fda-e8bf-4a96-9a85-a6e23a8c635c', // High Performance
+    'a1841308-3541-4fab-bc81-f71556f20b4a', // Power Saver
+    'e9a42b02-d5df-448d-aa00-03f14749eb61', // Ultimate Performance
+  ])
+  const list = await runCmd('powercfg /list')
+  const GUID_RX = /([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})/gi
+  const all = [...(list.out.matchAll(GUID_RX))].map(m => m[1].toLowerCase())
+  const toDelete = all.filter(g => !PROTECTED.has(g))
+  if (toDelete.length === 0) { send('No custom power plans to remove.', 'info'); return { ok: true, deleted: 0 } }
+  await runCmd('powercfg -setactive 381b4222-f694-41f0-9685-ff5bb260df2e')
+  let deleted = 0
+  for (const g of toDelete) {
+    const r = await runCmd(`powercfg /delete ${g}`)
+    if (r.ok) { send(`Deleted plan: ${g}`, 'ok'); deleted++ }
+    else { send(`Could not delete ${g}: ${r.err}`, 'warn') }
+  }
+  send(`Done — removed ${deleted} custom power plan(s). Balanced is now active.`, 'ok')
+  return { ok: true, deleted }
+})
+
 // What's New content
 const WHATS_NEW = [
+  { version: '1.4.0', date: 'May 2026', items: [
+    'AMD & Intel Max Performance Power Plan — fixed and fully working: creates a custom plan tuned for your CPU with EPP=0, CPPC, full boost policy, and no idle/sleep',
+    'Power Plan — "Clean up old power plans" button removes duplicate and third-party plans while keeping Balanced for revert',
+    'Auto Tweak Health Check — on every startup the app silently checks if Windows reverted any tweaks and prompts you to re-apply with one click',
+    'LibreHardwareMonitor — PawnIO install dialog no longer appears on startup',
+    'In-app updater — fixed: update download now works correctly for all users',
+    'Restore Point safety — Auto-Optimize is now properly blocked if restore point creation fails; shows instructions to fix',
+    'Discord Rich Presence — toggle setting now correctly enables/disables at runtime without restart',
+    'Session Start embed — GPU now shows in the Discord session start notification (was missing due to detection timing)',
+    'Bug fix — AMD and Intel power plan tweaks were silently calling the wrong function (regAdd instead of runCmd); all powercfg commands now execute correctly',
+  ]},
   { version: '1.3.9', date: 'May 2026', items: [
     'Settings tab — replaces Personalization; organized into Appearance, Behavior, System, and About sections',
     'Discord Rich Presence toggle — enable or disable Discord status directly from Settings',
