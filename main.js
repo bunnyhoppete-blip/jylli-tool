@@ -1924,10 +1924,16 @@ function buildAutoOptiSteps(si) {
     s('MMCSS applied.', 'ok')
   })
 
-  add('Enable GPU Hardware Scheduling', async (s, ps) => {
-    await ps('Set-ItemProperty -Path "HKLM:\\SYSTEM\\CurrentControlSet\\Control\\GraphicsDrivers" -Name HwSchMode -Value 2 -Force')
-    s('GPU HW Scheduling enabled. Reboot required.', 'ok')
-  })
+  const gpuLower = (si?.gpu || '').toLowerCase()
+  const hwschedSafe = gpuLower.includes('nvidia') || gpuLower.includes('rtx') || gpuLower.includes('gtx') ||
+                      gpuLower.includes('rx 6') || gpuLower.includes('rx 7') || gpuLower.includes('rx 9') ||
+                      gpuLower.includes('arc')
+  if (hwschedSafe) {
+    add('Enable GPU Hardware Scheduling', async (s, ps) => {
+      await ps('Set-ItemProperty -Path "HKLM:\\SYSTEM\\CurrentControlSet\\Control\\GraphicsDrivers" -Name HwSchMode -Value 2 -Force')
+      s('GPU HW Scheduling enabled. Reboot required.', 'ok')
+    })
+  }
 
   add('Disable CPU core parking', async (s, _, cmd) => {
     await cmd('powercfg /setacvalueindex SCHEME_CURRENT SUB_PROCESSOR CPMINCORES 100')
@@ -1976,24 +1982,26 @@ function buildAutoOptiSteps(si) {
     s('NetBIOS disabled.', 'ok')
   })
 
-  add('Disable network throttling', async (s, ps) => {
-    await ps('Set-ItemProperty -Path "HKLM:\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\Multimedia\\SystemProfile" -Name NetworkThrottlingIndex -Value 0xFFFFFFFF -Force')
-    s('Network throttling disabled.', 'ok')
-  })
+  if (!si?.isWifi) {
+    add('Disable network throttling', async (s, ps) => {
+      await ps('Set-ItemProperty -Path "HKLM:\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\Multimedia\\SystemProfile" -Name NetworkThrottlingIndex -Value 0xFFFFFFFF -Force')
+      s('Network throttling disabled.', 'ok')
+    })
 
-  add('Optimise TCP stack', async (s, _, cmd) => {
-    await cmd('netsh int tcp set global autotuninglevel=normal')
-    await cmd('netsh int tcp set global rss=enabled')
-    await cmd('netsh int tcp set global chimney=disabled')
-    await cmd('netsh int tcp set global ecncapability=disabled')
-    await cmd('netsh int tcp set global timestamps=disabled')
-    s('TCP stack optimised.', 'ok')
-  })
+    add('Optimise TCP stack', async (s, _, cmd) => {
+      await cmd('netsh int tcp set global autotuninglevel=normal')
+      await cmd('netsh int tcp set global rss=enabled')
+      await cmd('netsh int tcp set global chimney=disabled')
+      await cmd('netsh int tcp set global ecncapability=disabled')
+      await cmd('netsh int tcp set global timestamps=disabled')
+      s('TCP stack optimised.', 'ok')
+    })
 
-  add('Remove QoS 20% bandwidth reservation', async (s, ps) => {
-    await ps('New-Item -Path "HKLM:\\SOFTWARE\\Policies\\Microsoft\\Windows\\Psched" -Force | Out-Null; Set-ItemProperty -Path "HKLM:\\SOFTWARE\\Policies\\Microsoft\\Windows\\Psched" -Name NonBestEffortLimit -Value 0 -Force')
-    s('QoS reservation removed.', 'ok')
-  })
+    add('Remove QoS 20% bandwidth reservation', async (s, ps) => {
+      await ps('New-Item -Path "HKLM:\\SOFTWARE\\Policies\\Microsoft\\Windows\\Psched" -Force | Out-Null; Set-ItemProperty -Path "HKLM:\\SOFTWARE\\Policies\\Microsoft\\Windows\\Psched" -Name NonBestEffortLimit -Value 0 -Force')
+      s('QoS reservation removed.', 'ok')
+    })
+  }
 
   add('Disable startup app delay', async (s, ps) => {
     await ps('New-Item -Path "HKCU:\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\Serialize" -Force | Out-Null; Set-ItemProperty -Path "HKCU:\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\Serialize" -Name StartupDelayInMSec -Value 0 -Force')
@@ -2069,11 +2077,13 @@ function buildAutoOptiSteps(si) {
     s('Telemetry & DiagTrack disabled.', 'ok')
   })
 
-  add('Disable Power Throttling', async (s, ps) => {
-    await ps('New-Item -Path "HKLM:\\SYSTEM\\CurrentControlSet\\Control\\Power\\PowerThrottling" -Force -EA SilentlyContinue | Out-Null')
-    await ps('Set-ItemProperty -Path "HKLM:\\SYSTEM\\CurrentControlSet\\Control\\Power\\PowerThrottling" -Name PowerThrottlingOff -Value 1 -Force')
-    s('Power Throttling disabled.', 'ok')
-  })
+  if (!si?.isLaptop) {
+    add('Disable Power Throttling', async (s, ps) => {
+      await ps('New-Item -Path "HKLM:\\SYSTEM\\CurrentControlSet\\Control\\Power\\PowerThrottling" -Force -EA SilentlyContinue | Out-Null')
+      await ps('Set-ItemProperty -Path "HKLM:\\SYSTEM\\CurrentControlSet\\Control\\Power\\PowerThrottling" -Name PowerThrottlingOff -Value 1 -Force')
+      s('Power Throttling disabled.', 'ok')
+    })
+  }
 
   add('Disable UWP background apps', async (s, ps) => {
     await ps('New-Item -Path "HKCU:\\Software\\Microsoft\\Windows\\CurrentVersion\\BackgroundAccessApplications" -Force -EA SilentlyContinue | Out-Null')
