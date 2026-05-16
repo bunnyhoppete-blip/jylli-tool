@@ -1008,18 +1008,19 @@ canvas.radar-canvas { width: 180px; height: 180px; }
 @keyframes toastOut { from { opacity:1; transform: translateY(0); }               to { opacity:0; transform: translateY(8px) scale(0.97); } }
 @keyframes toastBar { from { width: 100%; } to { width: 0%; } }
 /* ─── UPDATE BANNER ──────────────────────────────────────────────────────── */
-#update-banner { position: fixed; bottom: 0; left: 0; right: 0; z-index: 9998; background: #0d1f12; border-top: 1px solid #1e5c2e; padding: 10px 20px; animation: slideUp 0.3s ease; }
+#update-banner { position: fixed; bottom: 0; left: 0; right: 0; z-index: 9998; background: #1a0a0e; border-top: 1px solid var(--pink); padding: 10px 20px; animation: slideUp 0.3s ease; }
 #update-banner-inner { display: flex; align-items: center; gap: 12px; max-width: 900px; margin: 0 auto; }
-#update-banner-icon { font-size: 18px; color: var(--success); flex-shrink: 0; }
+#update-banner-icon { font-size: 18px; color: var(--pink); flex-shrink: 0; }
 #update-banner-text { flex: 1; display: flex; flex-direction: column; gap: 2px; }
 #update-banner-title { font-size: 12px; font-weight: 700; color: var(--white); }
-#update-banner-sub { font-size: 10px; color: var(--gray); }
+#update-banner-sub { font-size: 10px; color: var(--gray); display: flex; align-items: center; gap: 8px; }
+#update-banner-whats-new { font-size: 10px; color: var(--pink); cursor: pointer; text-decoration: underline; background: none; border: none; padding: 0; }
 #update-banner-actions { display: flex; align-items: center; gap: 8px; }
 #update-progress-wrap { display: flex; align-items: center; gap: 6px; width: 160px; }
 #update-progress-bar { flex: 1; height: 4px; background: var(--border); border-radius: 2px; overflow: hidden; position: relative; }
-#update-progress-bar::after { content: ''; position: absolute; left: 0; top: 0; height: 100%; width: var(--pct, 0%); background: var(--success); transition: width 0.3s; border-radius: 2px; }
+#update-progress-bar::after { content: ''; position: absolute; left: 0; top: 0; height: 100%; width: var(--pct, 0%); background: var(--pink); transition: width 0.3s; border-radius: 2px; }
 #update-progress-pct { font-size: 10px; color: var(--gray); white-space: nowrap; }
-#update-btn-download { padding: 5px 14px; font-size: 11px; font-weight: 700; background: var(--success); color: #fff; border: none; border-radius: 6px; cursor: pointer; }
+#update-btn-download { padding: 5px 14px; font-size: 11px; font-weight: 700; background: var(--pink); color: #fff; border: none; border-radius: 6px; cursor: pointer; }
 #update-btn-download:disabled { opacity: 0.5; cursor: default; }
 #update-btn-install { padding: 5px 14px; font-size: 11px; font-weight: 700; background: var(--pink); color: #fff; border: none; border-radius: 6px; cursor: pointer; }
 #update-btn-dismiss { background: none; border: none; color: var(--muted); font-size: 14px; cursor: pointer; padding: 2px 6px; }
@@ -1394,15 +1395,18 @@ select.styled-select:focus { border-color: var(--pink); }
     <span id="update-banner-icon">⬆</span>
     <div id="update-banner-text">
       <span id="update-banner-title">Update available</span>
-      <span id="update-banner-sub">Click Download to get the latest version</span>
+      <span id="update-banner-sub">
+        A new version of Jylli Tool is ready to download.
+        <button id="update-banner-whats-new" onclick="showWhatsNew(_pendingUpdateVersion)">See what's new →</button>
+      </span>
     </div>
     <div id="update-banner-actions">
       <div id="update-progress-wrap" style="display:none">
         <div id="update-progress-bar"></div>
         <span id="update-progress-pct">0%</span>
       </div>
-      <button id="update-btn-download" onclick="startUpdateDownload()">Download</button>
-      <button id="update-btn-install" style="display:none" onclick="api.installUpdate()">Restart &amp; Install</button>
+      <button id="update-btn-download" onclick="startUpdateDownload()">⬇ Download</button>
+      <button id="update-btn-install" style="display:none" onclick="api.installUpdate()">↺ Restart &amp; Install</button>
       <button id="update-btn-dismiss" onclick="document.getElementById('update-banner').style.display='none'">✕</button>
     </div>
   </div>
@@ -1959,6 +1963,15 @@ async function init() {
   window._whatsNew = await api.getWhatsNew().catch(() => [])
 
   const appVersion = await api.getAppVersion()
+
+  // Auto-show What's New when user opens app after an update
+  if (settings.lastSeenVersion && settings.lastSeenVersion !== appVersion) {
+    setTimeout(() => showWhatsNew(appVersion), 1500)
+  }
+  if (settings.lastSeenVersion !== appVersion) {
+    settings.lastSeenVersion = appVersion
+    api.saveSettings(settings)
+  }
   document.getElementById('load-ver').textContent       = `v${appVersion} — Detecting system specs…`
   document.getElementById('titlebar-ver').textContent   = `v${appVersion}`
   document.getElementById('sidebar-ver').textContent    = `v${appVersion} · Jylli Tool`
@@ -2144,10 +2157,9 @@ async function init() {
 
   // Wire update events first, then check — so we never miss a fast response
   api.onUpdateAvailable?.((info) => {
-    const banner = document.getElementById('update-banner')
+    window._pendingUpdateVersion = info.version
     document.getElementById('update-banner-title').textContent = `Update v${info.version} available`
-    document.getElementById('update-banner-sub').textContent = 'A new version of Jylli Tool is ready to download.'
-    banner.style.display = 'block'
+    document.getElementById('update-banner').style.display = 'block'
   })
   api.onUpdateProgress?.((progress) => {
     const pct = Math.round(progress.percent || 0)
@@ -2159,7 +2171,7 @@ async function init() {
     document.getElementById('update-progress-wrap').style.display = 'none'
     document.getElementById('update-btn-download').style.display = 'none'
     document.getElementById('update-btn-install').style.display = 'inline-block'
-    document.getElementById('update-banner-sub').textContent = 'Download complete — restart to apply the update.'
+    showWhatsNew(info.version || window._pendingUpdateVersion)
   })
 
   // Check for updates after a short delay so the window is fully ready
@@ -2393,11 +2405,11 @@ function showPage(page) {
 }
 
 // ─── What's New ───────────────────────────────────────────────────────────────
-async function showWhatsNew() {
+async function showWhatsNew(version) {
   try {
     const data = await api.getWhatsNew()
     if (!data?.length) return
-    const v = data[0]
+    const v = (version ? data.find(e => e.version === String(version)) : null) || data[0]
     document.getElementById('wn-ver').textContent = `Version ${v.version} · ${v.date}`
     document.getElementById('wn-items').innerHTML = v.items.map(item => `
       <div style="display:flex;align-items:flex-start;gap:10px;padding:8px 0;border-bottom:1px solid var(--border);font-size:11px;color:var(--gray)">

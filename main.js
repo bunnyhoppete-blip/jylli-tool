@@ -228,17 +228,12 @@ async function destroyDiscordRPC() {
   }
 }
 
-// ─── Analytics Webhook ───────────────────────────────────────────────────────
-const WEBHOOK_URL    = 'https://discord.com/api/webhooks/1504473739599941682/FrOgbUEKp9_1jwSKX2o4gbBAS2FSFbgEnVNVte5s9DDoBS8J7_1aC-7JzWG7K1ZZ66BZ'
+// ─── Analytics ───────────────────────────────────────────────────────────────
+const BUG_WEBHOOK_URL = 'https://discord.com/api/webhooks/1505200051280936981/XdFEtv10IH-B9ZSIVkfW0cBOkGx0DcOf71YrnbUVgggjYnwGHmdZEcm_CKG-U8hNPmZV'
+const BOT_URL         = 'https://jylli-bot-production.up.railway.app'
+const BOT_SECRET      = 'jyllibot-secret'
 let ANALYTICS_PATH = null
 let APP_VERSION    = null
-
-// Brand colors (matches app theme)
-const COLOR_PINK    = 0xFF2E63  // primary accent — launches, returning users
-const COLOR_GREEN   = 0x2ECC71  // new installs
-const COLOR_ERROR   = 0xFF2E63  // crashes
-const COLOR_WARNING = 0xFF6B35  // non-fatal errors
-const COLOR_PURPLE  = 0x9B59B6  // session end / uninstall
 
 // Session start time — used to calculate duration on quit
 let sessionStartTime = Date.now()
@@ -254,17 +249,39 @@ function saveAnalytics(data) {
   try { fs.writeFileSync(ANALYTICS_PATH, JSON.stringify(data, null, 2)) } catch {}
 }
 
-function sendWebhook(payload) {
+function sendWebhook(payload, targetUrl) {
   try {
     const https = require('https')
     const body = JSON.stringify(payload)
-    const url = new URL(WEBHOOK_URL)
+    const url = new URL(targetUrl)
     const req = https.request({
       hostname: url.hostname, path: url.pathname + url.search,
       method: 'POST', headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(body) }
     })
     req.on('error', () => {})
     req.write(body)
+    req.end()
+  } catch {}
+}
+
+function notifyBot(event, extra = {}) {
+  try {
+    const { winVer, cpu, ram, gpu, isLaptop, isWifi, hasFiveM } = getSystemFields()
+    const analytics = loadAnalytics()
+    const payload = JSON.stringify({
+      secret: BOT_SECRET, event, version: APP_VERSION,
+      userId: analytics.userId, sessions: analytics.sessions,
+      totalTweaks: analytics.totalTweaksApplied || 0,
+      cpu, ram, gpu, winVer, isLaptop, isWifi, hasFiveM,
+      ...extra
+    })
+    const url = new URL(BOT_URL)
+    const req = require('https').request({
+      hostname: url.hostname, path: '/',
+      method: 'POST', headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(payload) }
+    })
+    req.on('error', () => {})
+    req.write(payload)
     req.end()
   } catch {}
 }
@@ -317,55 +334,11 @@ function webhookLaunch() {
     const ts = Math.floor(nowMs / 1000)
 
     if (isNewUser) {
-      sendWebhook({
-        username: 'Jylli Tool',
-        embeds: [{
-          color: COLOR_GREEN,
-          title: '🟢  New Install',
-          description: `First launch on this machine — **v${APP_VERSION}**`,
-          fields: [
-            { name: '📅  Time',           value: `<t:${ts}:f>`,                                            inline: true },
-            { name: '🪪  User ID',        value: `\`${analytics.userId}\``,                                inline: true },
-            { name: '​',             value: '​',                                                 inline: true },
-            { name: '⚙️  CPU',            value: `\`${cpu.length > 32 ? cpu.slice(0, 32) + '…' : cpu}\``, inline: true },
-            { name: '🧠  RAM',            value: ram,                                                      inline: true },
-            ...(gpu ? [{ name: '🎮  GPU', value: `\`${gpu.length > 32 ? gpu.slice(0, 32) + '…' : gpu}\``, inline: true }] : [{ name: '🎮  GPU', value: '—', inline: true }]),
-            { name: '🖥️  OS',             value: winVer,                                                   inline: true },
-            { name: '🔧  Tweaks Applied', value: '**0**',                                                  inline: true },
-            { name: '🔢  Session',        value: '**#1**',                                                 inline: true },
-          ],
-          footer: { text: `Jylli Tool  ·  v${APP_VERSION}` },
-          timestamp: nowIso,
-        }]
-      })
+      notifyBot('new_install')
     } else {
       const daysSinceLast = lastSeenIso
         ? Math.floor((nowMs - new Date(lastSeenIso).getTime()) / 86400000) : null
-      const lastSeenLabel = daysSinceLast === null ? '—'
-        : daysSinceLast === 0 ? 'Today'
-        : daysSinceLast === 1 ? 'Yesterday'
-        : `${daysSinceLast} days ago`
-      sendWebhook({
-        username: 'Jylli Tool',
-        embeds: [{
-          color: COLOR_PINK,
-          title: '▶  Session Start',
-          description: `Session **#${analytics.sessions}** — last seen **${lastSeenLabel}** — **v${APP_VERSION}**`,
-          fields: [
-            { name: '📅  Time',           value: `<t:${ts}:f>`,                                            inline: true },
-            { name: '🪪  User ID',        value: `\`${analytics.userId}\``,                                inline: true },
-            { name: '​',             value: '​',                                                 inline: true },
-            { name: '⚙️  CPU',            value: `\`${cpu.length > 32 ? cpu.slice(0, 32) + '…' : cpu}\``, inline: true },
-            { name: '🧠  RAM',            value: ram,                                                      inline: true },
-            ...(gpu ? [{ name: '🎮  GPU', value: `\`${gpu.length > 32 ? gpu.slice(0, 32) + '…' : gpu}\``, inline: true }] : [{ name: '🎮  GPU', value: '—', inline: true }]),
-            { name: '🖥️  OS',             value: winVer,                                                   inline: true },
-            { name: '🔧  Tweaks Applied', value: `**${analytics.totalTweaksApplied || 0}** lifetime`,      inline: true },
-            { name: '🔢  Sessions',       value: `**${analytics.sessions}**`,                              inline: true },
-          ],
-          footer: { text: `Jylli Tool  ·  v${APP_VERSION}` },
-          timestamp: nowIso,
-        }]
-      })
+      notifyBot('session_start', { daysSinceLast })
     }
   } catch {}
 }
@@ -382,24 +355,7 @@ function webhookSessionEnd(durationMs, pageVisits, tweaksThisSession) {
     analytics.totalTweaksApplied = (analytics.totalTweaksApplied || 0) + (tweaksThisSession || 0)
     saveAnalytics(analytics)
 
-    const ts = Math.floor(Date.now() / 1000)
-    sendWebhook({
-      username: 'Jylli Tool',
-      embeds: [{
-        color: COLOR_PURPLE,
-        title: '🔴  Session End',
-        description: `**${durationLabel}** session — v${APP_VERSION}`,
-        fields: [
-          { name: '🪪  User',           value: `\`${analytics.userId}\``,                                                           inline: true },
-          { name: '⏱️  Duration',        value: `**${durationLabel}**`,                                                              inline: true },
-          { name: '📅  Time',           value: `<t:${ts}:f>`,                                                                       inline: true },
-          { name: '🔧  Tweaks Applied', value: `**${tweaksThisSession || 0}** this session  ·  **${analytics.totalTweaksApplied}** lifetime`, inline: false },
-          { name: '🔢  Sessions',       value: `**${analytics.sessions || 1}**`,                                                    inline: true },
-        ],
-        footer: { text: `Jylli Tool  ·  v${APP_VERSION}` },
-        timestamp: new Date().toISOString(),
-      }]
-    })
+    notifyBot('session_end', { durationLabel, tweaksThisSession: tweaksThisSession || 0 })
   } catch {}
 }
 
@@ -415,27 +371,7 @@ function webhookError(type, err) {
       .join('\n')
       .trim()
 
-    const ts = Math.floor(Date.now() / 1000)
-
-    sendWebhook({
-      username: 'Jylli Tool',
-      embeds: [{
-        color: isCrash ? COLOR_ERROR : COLOR_WARNING,
-        title: isCrash ? '💥  App Crash' : '⚠️  Unhandled Error',
-        description: isCrash
-          ? 'Jylli Tool encountered a fatal error and crashed.'
-          : 'An unhandled error occurred but the app kept running.',
-        fields: [
-          { name: '🪪  User',   value: `\`${userId}\``,   inline: true },
-          { name: '📅  Time',   value: `<t:${ts}:f>`,     inline: true },
-          { name: '🔖  Type',   value: `\`${type}\``,     inline: true },
-          { name: '❌  Error',  value: `\`\`\`\n${msg.slice(0, 800)}\n\`\`\`` },
-          ...(stack ? [{ name: '📋  Stack Trace', value: `\`\`\`\n${stack.slice(0, 800)}\n\`\`\`` }] : []),
-        ],
-        footer: { text: `Jylli Tool  ·  v${APP_VERSION}  ·  Error Report` },
-        timestamp: new Date().toISOString(),
-      }]
-    })
+    notifyBot('crash', { type, errorMsg: msg.slice(0, 800), stack: stack.slice(0, 800) })
   } catch {}
 }
 
@@ -447,7 +383,7 @@ function webhookBugReport({ title, description, steps, page }) {
     const ts = Math.floor(Date.now() / 1000)
     const deviceType = isLaptop ? '💻 Laptop' : '🖥️ Desktop'
     const netType    = isWifi   ? '📶 Wi-Fi'  : '🔌 Ethernet'
-    sendWebhook({
+    const bugPayload = {
       username: 'Jylli Tool — Bug Report',
       embeds: [{
         color: 0xE74C3C,
@@ -468,7 +404,9 @@ function webhookBugReport({ title, description, steps, page }) {
         footer: { text: `Jylli Tool  ·  v${APP_VERSION}  ·  Bug Report` },
         timestamp: new Date().toISOString(),
       }]
-    })
+    }
+    if (BUG_WEBHOOK_URL) sendWebhook(bugPayload, BUG_WEBHOOK_URL)
+    notifyBot('bug_report', { bugTitle: title.slice(0, 80) })
   } catch {}
 }
 
@@ -5077,7 +5015,13 @@ const WHATS_NEW = [
     'Pre-Flight — Driver Update Checker: scans GPU, network, and audio drivers and flags outdated ones with download links',
     'Pre-Flight — CPU Benchmark: run a 10-second CPU test and compare scores before/after tweaks',
     'Tweak History — Undo/Re-apply button on every history entry for reversible tweaks',
-    'Discord RPC — already shows active game detected by the game watcher (was already implemented in v1.3.7)',
+    'Pulse — spec-aware tuning: MMCSS, core unparking, interrupt affinity, and process priority now adapt to CPU core count, RAM, and laptop/desktop detection',
+    'Pulse — high-RAM systems (24 GB+) skip background process termination to avoid cache eviction stutters',
+    'Bug fix — fullscreen flickering eliminated: game watcher replaced PowerShell with native tasklist, removing focus-steal events in FiveM and other fullscreen games',
+    'Bug fix — Pulse, FiveM settings, and Arma settings windows no longer steal focus from fullscreen games',
+    'Bug fix — DWM deprioritization removed from Pulse (was causing compositor layer flush on click)',
+    'Bug fix — Auto-Optimize now skips network tweaks on Wi-Fi systems and power throttling on laptops',
+    'Bug fix — power plan cards now filtered by CPU brand (Intel card hidden on AMD, AMD card hidden on Intel)',
   ]},
   { version: '1.3.7', date: 'May 2026', items: [
     'BIOS Tuner — detects BIOS vendor (AMI/Phoenix/Insyde) and shows targeted compatibility message',
