@@ -266,6 +266,7 @@ function sendWebhook(payload, targetUrl) {
 
 function notifyBot(event, extra = {}) {
   try {
+    if (loadSettings().analyticsOptOut) return
     const { winVer, cpu, ram, gpu, isLaptop, isWifi, hasFiveM } = getSystemFields()
     const analytics = loadAnalytics()
     const payload = JSON.stringify({

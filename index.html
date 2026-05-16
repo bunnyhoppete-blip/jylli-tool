@@ -1698,8 +1698,8 @@ select.styled-select:focus { border-color: var(--pink); }
         <span class="nav-icon"><i class="fa fa-clipboard-list"></i></span><span class="nav-label">Tweak History</span>
       </button>
       <div class="sidebar-divider"></div>
-      <button class="nav-btn" data-page="personalization" data-label="Personalization" onclick="showPage('personalization')">
-        <span class="nav-icon"><i class="fa fa-palette"></i></span><span class="nav-label">Personalization</span>
+      <button class="nav-btn" data-page="settings" data-label="Settings" onclick="showPage('settings')">
+        <span class="nav-icon"><i class="fa fa-gear"></i></span><span class="nav-label">Settings</span>
       </button>
       <button class="sidebar-toggle-btn" id="sidebar-toggle-btn" onclick="toggleSidebar()" title="Toggle sidebar">
         <span id="sidebar-toggle-icon"><i class="fa fa-angles-left"></i></span>
@@ -1752,7 +1752,7 @@ const LANG = {
       'game-opti':'Per-game optimization profiles','app-optimizer':'App-specific tuning',
       'fivem':'FiveM & GTA V tweaks','cleanup':'Clean temp files and caches',
       'ping-test':'Test network latency','scheduler':'Task scheduler management',
-      'changelog':'Applied tweak history','personalization':'Theme and display settings',
+      'changelog':'Applied tweak history','settings':'App preferences and personalization',
       'latency-monitor':'Real-time latency tracking',
       'pulse':'Game performance mode — timer resolution, core unparking, interrupt routing',
       'bios-tuner':'Read and write BIOS/UEFI settings directly from Windows',
@@ -1906,7 +1906,7 @@ const LANG = {
       'hardware':'Advanced','startup-manager':'Startups','game-opti':'Game Profiles',
       'app-optimizer':'App Optimizer','fivem':'FiveM','cleanup':'Cleanup',
       'ping-test':'Ping Test','scheduler':'Scheduler','changelog':'Tweak History',
-      'personalization':'Personalization','latency-monitor':'Latency Monitor',
+      'settings':'Settings','latency-monitor':'Latency Monitor',
       'pulse':'Pulse','bios-tuner':'BIOS Tuner',
     },
     aomQuestions: [
@@ -2271,7 +2271,7 @@ const CMD_PAGES = [
   { name: 'Ping Test',     sub: 'Latency to game servers',page: 'ping-test',       icon: 'fa-satellite-dish' },
   { name: 'Scheduler',     sub: 'Automated tweaks',       page: 'scheduler',       icon: 'fa-clock' },
   { name: 'Tweak History', sub: 'Changelog of changes',   page: 'changelog',       icon: 'fa-clipboard-list' },
-  { name: 'Personalization',sub: 'Themes & accent colors',page: 'personalization', icon: 'fa-palette' },
+  { name: 'Settings',       sub: 'App preferences',       page: 'settings',        icon: 'fa-gear' },
 ]
 const CMD_ACTIONS = [
   { name: 'Create Restore Point', sub: 'Quick safety snapshot', icon: 'fa-shield-halved', action: () => quickCreateRP() },
@@ -2409,7 +2409,7 @@ function showPage(page) {
       'startup-manager': buildStartupManager, 'game-opti': buildGameOpti,
       'app-optimizer': buildAppOptimizer, fivem: buildFiveM, cleanup: buildCleanup,
       'ping-test': buildPingTest, scheduler: buildScheduler, changelog: buildChangelog,
-      personalization: buildPersonalization, 'latency-monitor': buildLatencyMonitor,
+      settings: buildSettings, 'latency-monitor': buildLatencyMonitor,
       pulse: buildPulse,
       'bios-tuner': buildBiosTuner,
     }
@@ -2563,6 +2563,9 @@ function toggleAdvancedMode() {
   }
   settings.advancedMode = isOn
   api.saveSettings(settings).catch(() => {})
+  // Keep Settings page Advanced toggle in sync
+  const advCh = document.getElementById('settings-adv-check')
+  if (advCh) advCh.checked = isOn
   if (isOn) {
     document.getElementById('advanced-intro-overlay').style.display = 'flex'
   } else {
@@ -2571,18 +2574,104 @@ function toggleAdvancedMode() {
   }
 }
 
-function buildPersonalization(c) {
+function buildSettings(c) {
   const theme = settings.theme || 'jylli'
   c.innerHTML = `<div class="page-pad">
+
+    <!-- Appearance -->
     <div class="section-card">
-      <div class="section-head"><span class="section-accent"></span><span class="section-title">Theme</span></div>
+      <div class="section-head"><span class="section-accent"></span><span class="section-title">Appearance</span></div>
       <div class="section-body">
         <div style="font-size:11px;color:var(--gray);margin-bottom:12px">Choose a full theme — changes background colors and accent color together.</div>
         <div class="theme-grid" id="theme-grid" style="grid-template-columns:repeat(4,1fr)"></div>
+        <div id="accent-row" style="margin-top:16px;display:flex;align-items:center;gap:12px;padding:0 2px">
+          <label style="font-size:12px;color:var(--gray)">Custom accent</label>
+          <input type="color" id="accent-color-picker"
+            style="width:36px;height:28px;border:none;background:none;cursor:pointer;padding:0;border-radius:4px">
+          <button class="btn btn-ghost btn-sm" onclick="resetAccentColor()" style="font-size:11px">Reset</button>
+          <span style="font-size:11px;color:var(--gray)">Override the accent color for any theme</span>
+        </div>
       </div>
     </div>
+
+    <!-- Behavior -->
+    <div class="section-card" style="margin-top:14px">
+      <div class="section-head"><span class="section-accent"></span><span class="section-title">Behavior</span></div>
+      <div class="section-body" style="display:flex;flex-direction:column;gap:14px">
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:16px">
+          <div>
+            <div style="font-size:12px;font-weight:600;color:var(--white)">Game Watcher</div>
+            <div style="font-size:11px;color:var(--gray);margin-top:2px">Auto-detect game launches and apply per-game profiles</div>
+          </div>
+          <label class="toggle-pill" id="settings-gw-pill">
+            <input type="checkbox" id="settings-gw-check" onchange="settingsToggleGameWatcher(this.checked)">
+            <span class="pill-slider"></span>
+          </label>
+        </div>
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:16px">
+          <div>
+            <div style="font-size:12px;font-weight:600;color:var(--white)">Auto-Pulse</div>
+            <div style="font-size:11px;color:var(--gray);margin-top:2px">Automatically activate Pulse when a game is detected</div>
+          </div>
+          <label class="toggle-pill" id="settings-ap-pill">
+            <input type="checkbox" id="settings-ap-check" onchange="settingsToggleAutoPulse(this.checked)">
+            <span class="pill-slider"></span>
+          </label>
+        </div>
+      </div>
+    </div>
+
+    <!-- System -->
+    <div class="section-card" style="margin-top:14px">
+      <div class="section-head"><span class="section-accent"></span><span class="section-title">System</span></div>
+      <div class="section-body" style="display:flex;flex-direction:column;gap:14px">
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:16px">
+          <div>
+            <div style="font-size:12px;font-weight:600;color:var(--white)">Advanced Mode</div>
+            <div style="font-size:11px;color:var(--gray);margin-top:2px">Unlock Process Manager, Latency Monitor, Ping Test, and BIOS Tuner</div>
+          </div>
+          <label class="toggle-pill" id="settings-adv-pill">
+            <input type="checkbox" id="settings-adv-check" onchange="toggleAdvancedMode()">
+            <span class="pill-slider"></span>
+          </label>
+        </div>
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:16px">
+          <div>
+            <div style="font-size:12px;font-weight:600;color:var(--white)">Anonymous Usage Stats</div>
+            <div style="font-size:11px;color:var(--gray);margin-top:2px">Send anonymous session data to help improve Jylli Tool</div>
+          </div>
+          <label class="toggle-pill">
+            <input type="checkbox" id="settings-analytics-check" onchange="settingsToggleAnalytics(this.checked)">
+            <span class="pill-slider"></span>
+          </label>
+        </div>
+      </div>
+    </div>
+
+    <!-- About -->
+    <div class="section-card" style="margin-top:14px">
+      <div class="section-head"><span class="section-accent"></span><span class="section-title">About</span></div>
+      <div class="section-body">
+        <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px">
+          <div>
+            <div style="font-size:13px;font-weight:700;color:var(--white)">Jylli Tool</div>
+            <div style="font-size:11px;color:var(--gray);margin-top:2px">Version <span id="settings-ver-label">…</span></div>
+          </div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap">
+            <button class="btn btn-primary btn-sm" onclick="api.checkUpdate().then(r => { if(r && !r.available) toast('Already up to date','','ok') })">
+              <i class="fa fa-rotate"></i> Check for Updates
+            </button>
+            <button class="btn btn-ghost btn-sm" onclick="api.openExternal('https://discord.gg/jylligraffat')">
+              <i class="fa-brands fa-discord"></i> Discord
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
   </div>`
 
+  // Theme grid
   const grid = c.querySelector('#theme-grid')
   Object.entries(THEMES).forEach(([key, t]) => {
     const card = document.createElement('div')
@@ -2607,7 +2696,6 @@ function buildPersonalization(c) {
       settings.theme = key
       api.saveSettings(settings)
       applyTheme(key)
-      // Sync picker to theme accent color
       const picker = document.getElementById('accent-color-picker')
       if (picker) picker.value = t.accent
       delete settings.accentColor
@@ -2615,23 +2703,10 @@ function buildPersonalization(c) {
     grid.appendChild(card)
   })
 
-  // Accent color picker
-  const accentRow = document.createElement('div')
-  accentRow.style.cssText = 'margin-top:16px;display:flex;align-items:center;gap:12px;padding:0 2px'
-  accentRow.innerHTML = `
-    <label style="font-size:12px;color:var(--gray)">Custom accent</label>
-    <input type="color" id="accent-color-picker"
-      style="width:36px;height:28px;border:none;background:none;cursor:pointer;padding:0;border-radius:4px">
-    <button class="btn btn-ghost btn-sm" onclick="resetAccentColor()" style="font-size:11px">Reset</button>
-    <span style="font-size:11px;color:var(--gray)">Override the accent color for any theme</span>`
-  const sectionBody = c.querySelector('.section-body')
-  sectionBody.appendChild(accentRow)
-
-  // Set picker to current accent (custom or theme default)
+  // Accent picker
   const picker = document.getElementById('accent-color-picker')
   const currentTheme = THEMES[settings.theme || 'jylli']
   picker.value = settings.accentColor || currentTheme.accent
-
   picker.addEventListener('input', e => {
     const hex = e.target.value
     const r = parseInt(hex.slice(1,3),16), g = parseInt(hex.slice(3,5),16), b = parseInt(hex.slice(5,7),16)
@@ -2644,6 +2719,39 @@ function buildPersonalization(c) {
     settings.accentColor = hex
     api.saveSettings(settings)
   })
+
+  // Behavior toggles — set initial state
+  const gwCheck = document.getElementById('settings-gw-check')
+  if (gwCheck) gwCheck.checked = !!settings.gameWatcherEnabled
+  const apCheck = document.getElementById('settings-ap-check')
+  if (apCheck) apCheck.checked = !!settings.autoPulseEnabled
+
+  // System toggles — set initial state
+  const advCheck = document.getElementById('settings-adv-check')
+  if (advCheck) advCheck.checked = !!settings.advancedMode
+  const analyticsCheck = document.getElementById('settings-analytics-check')
+  if (analyticsCheck) analyticsCheck.checked = !settings.analyticsOptOut
+
+  // About version
+  const verLabel = document.getElementById('settings-ver-label')
+  if (verLabel) verLabel.textContent = appVersion || '…'
+}
+
+function settingsToggleGameWatcher(on) {
+  if (on !== gameWatcherRunning) toggleGameWatcher()
+}
+
+function settingsToggleAutoPulse(on) {
+  if (on !== autoPulseEnabled) toggleAutoPulse()
+  // Re-sync checkbox in case toggleAutoPulse flipped it
+  const ch = document.getElementById('settings-ap-check')
+  if (ch) ch.checked = !!settings.autoPulseEnabled
+}
+
+function settingsToggleAnalytics(on) {
+  settings.analyticsOptOut = !on
+  api.saveSettings(settings)
+  toast(on ? 'Usage stats enabled' : 'Usage stats disabled', '', on ? 'ok' : 'info')
 }
 
 function shadeColor(hex, pct) {
