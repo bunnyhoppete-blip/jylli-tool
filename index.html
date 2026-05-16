@@ -2581,11 +2581,11 @@ function buildSettings(c) {
 
     <!-- Appearance -->
     <div class="section-card">
-      <div class="section-head"><span class="section-accent"></span><span class="section-title">Appearance</span></div>
-      <div class="section-body">
+      <div class="section-header"><span class="section-accent"></span><span class="section-title">Appearance</span></div>
+      <div style="padding:14px 18px">
         <div style="font-size:11px;color:var(--gray);margin-bottom:12px">Choose a full theme — changes background colors and accent color together.</div>
         <div class="theme-grid" id="theme-grid" style="grid-template-columns:repeat(4,1fr)"></div>
-        <div id="accent-row" style="margin-top:16px;display:flex;align-items:center;gap:12px;padding:0 2px">
+        <div id="accent-row" style="margin-top:16px;display:flex;align-items:center;gap:12px">
           <label style="font-size:12px;color:var(--gray)">Custom accent</label>
           <input type="color" id="accent-color-picker"
             style="width:36px;height:28px;border:none;background:none;cursor:pointer;padding:0;border-radius:4px">
@@ -2596,76 +2596,70 @@ function buildSettings(c) {
     </div>
 
     <!-- Behavior -->
-    <div class="section-card" style="margin-top:14px">
-      <div class="section-head"><span class="section-accent"></span><span class="section-title">Behavior</span></div>
-      <div class="section-body" style="display:flex;flex-direction:column;gap:14px">
-        <div style="display:flex;align-items:center;justify-content:space-between;gap:16px">
-          <div>
-            <div style="font-size:12px;font-weight:600;color:var(--white)">Game Watcher</div>
-            <div style="font-size:11px;color:var(--gray);margin-top:2px">Auto-detect game launches and apply per-game profiles</div>
-          </div>
-          <label class="toggle-pill" id="settings-gw-pill">
-            <input type="checkbox" id="settings-gw-check" onchange="settingsToggleGameWatcher(this.checked)">
-            <span class="pill-slider"></span>
-          </label>
+    <div class="section-card">
+      <div class="section-header"><span class="section-accent"></span><span class="section-title">Behavior</span></div>
+      <div class="startup-row" style="justify-content:space-between">
+        <div>
+          <div class="startup-name">Game Watcher</div>
+          <div class="startup-cmd">Auto-detect game launches and apply per-game profiles</div>
         </div>
-        <div style="display:flex;align-items:center;justify-content:space-between;gap:16px">
-          <div>
-            <div style="font-size:12px;font-weight:600;color:var(--white)">Auto-Pulse</div>
-            <div style="font-size:11px;color:var(--gray);margin-top:2px">Automatically activate Pulse when a game is detected</div>
-          </div>
-          <label class="toggle-pill" id="settings-ap-pill">
-            <input type="checkbox" id="settings-ap-check" onchange="settingsToggleAutoPulse(this.checked)">
-            <span class="pill-slider"></span>
-          </label>
+        <label class="toggle-pill" id="settings-gw-pill">
+          <input type="checkbox" id="settings-gw-check" onchange="settingsToggleGameWatcher(this.checked)">
+          <span class="pill-slider"></span>
+        </label>
+      </div>
+      <div class="startup-row" style="justify-content:space-between">
+        <div>
+          <div class="startup-name">Auto-Pulse</div>
+          <div class="startup-cmd">Automatically activate Pulse when a game is detected</div>
         </div>
+        <label class="toggle-pill" id="settings-ap-pill">
+          <input type="checkbox" id="settings-ap-check" onchange="settingsToggleAutoPulse(this.checked)">
+          <span class="pill-slider"></span>
+        </label>
       </div>
     </div>
 
     <!-- System -->
-    <div class="section-card" style="margin-top:14px">
-      <div class="section-head"><span class="section-accent"></span><span class="section-title">System</span></div>
-      <div class="section-body" style="display:flex;flex-direction:column;gap:14px">
-        <div style="display:flex;align-items:center;justify-content:space-between;gap:16px">
-          <div>
-            <div style="font-size:12px;font-weight:600;color:var(--white)">Advanced Mode</div>
-            <div style="font-size:11px;color:var(--gray);margin-top:2px">Unlock Process Manager, Latency Monitor, Ping Test, and BIOS Tuner</div>
-          </div>
-          <label class="toggle-pill" id="settings-adv-pill">
-            <input type="checkbox" id="settings-adv-check" onchange="toggleAdvancedMode()">
-            <span class="pill-slider"></span>
-          </label>
+    <div class="section-card">
+      <div class="section-header"><span class="section-accent"></span><span class="section-title">System</span></div>
+      <div class="startup-row" style="justify-content:space-between">
+        <div>
+          <div class="startup-name">Advanced Mode</div>
+          <div class="startup-cmd">Unlock Process Manager, Latency Monitor, Ping Test, and BIOS Tuner</div>
         </div>
-        <div style="display:flex;align-items:center;justify-content:space-between;gap:16px">
-          <div>
-            <div style="font-size:12px;font-weight:600;color:var(--white)">Anonymous Usage Stats</div>
-            <div style="font-size:11px;color:var(--gray);margin-top:2px">Send anonymous session data to help improve Jylli Tool</div>
-          </div>
-          <label class="toggle-pill">
-            <input type="checkbox" id="settings-analytics-check" onchange="settingsToggleAnalytics(this.checked)">
-            <span class="pill-slider"></span>
-          </label>
+        <label class="toggle-pill" id="settings-adv-pill">
+          <input type="checkbox" id="settings-adv-check" onchange="toggleAdvancedMode()">
+          <span class="pill-slider"></span>
+        </label>
+      </div>
+      <div class="startup-row" style="justify-content:space-between">
+        <div>
+          <div class="startup-name">Anonymous Usage Stats</div>
+          <div class="startup-cmd">Send anonymous session data to help improve Jylli Tool</div>
         </div>
+        <label class="toggle-pill">
+          <input type="checkbox" id="settings-analytics-check" onchange="settingsToggleAnalytics(this.checked)">
+          <span class="pill-slider"></span>
+        </label>
       </div>
     </div>
 
     <!-- About -->
-    <div class="section-card" style="margin-top:14px">
-      <div class="section-head"><span class="section-accent"></span><span class="section-title">About</span></div>
-      <div class="section-body">
-        <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px">
-          <div>
-            <div style="font-size:13px;font-weight:700;color:var(--white)">Jylli Tool</div>
-            <div style="font-size:11px;color:var(--gray);margin-top:2px">Version <span id="settings-ver-label">…</span></div>
-          </div>
-          <div style="display:flex;gap:8px;flex-wrap:wrap">
-            <button class="btn btn-primary btn-sm" onclick="api.checkUpdate().then(r => { if(r && !r.available) toast('Already up to date','','ok') })">
-              <i class="fa fa-rotate"></i> Check for Updates
-            </button>
-            <button class="btn btn-ghost btn-sm" onclick="api.openExternal('https://discord.gg/jylligraffat')">
-              <i class="fa-brands fa-discord"></i> Discord
-            </button>
-          </div>
+    <div class="section-card">
+      <div class="section-header"><span class="section-accent"></span><span class="section-title">About</span></div>
+      <div class="startup-row" style="justify-content:space-between;flex-wrap:wrap;gap:10px">
+        <div>
+          <div class="startup-name">Jylli Tool</div>
+          <div class="startup-cmd">Version <span id="settings-ver-label">…</span></div>
+        </div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <button class="btn btn-primary btn-sm" onclick="api.checkUpdate().then(r => { if(r && !r.available) toast('Already up to date','','ok') })">
+            <i class="fa fa-rotate"></i> Check for Updates
+          </button>
+          <button class="btn btn-ghost btn-sm" onclick="api.openExternal('https://discord.gg/jylligraffat')">
+            <i class="fa-brands fa-discord"></i> Discord
+          </button>
         </div>
       </div>
     </div>
