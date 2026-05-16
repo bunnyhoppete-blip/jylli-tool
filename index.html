@@ -7148,8 +7148,8 @@ function buildHardware(c) {
       { id:'disable-hdcp',       name:'Disable HDCP (DRM overhead)',    desc:'May break HDMI audio on some monitors. Reboot required.', icon:'<i class="fa fa-lock-open"></i>', danger:true, dangerLabel:'Confirm HDCP off' },
     ]},
     { title:'Power Plan', cards:[
-      { id:'intel-power-plan', name:'Intel Max Performance Power Plan', desc:'Creates a custom power plan tuned for Intel CPUs — Speed Shift (HWP) on, aggressive boost mode, no C-state idle, all cores active, PCIe and USB suspend off. Verifies Intel CPU before applying.', icon:'<i class="fa fa-bolt"></i>', warning: isLaptop ? 'Laptop: increases heat and reduces battery life.' : '' },
-      { id:'amd-power-plan',   name:'AMD Max Performance Power Plan',   desc:'Creates a custom power plan tuned for AMD CPUs — CPPC preferred cores on, aggressive boost mode, no C-state idle, all cores active, PCIe and USB suspend off. Verifies AMD CPU before applying.', icon:'<i class="fa fa-bolt"></i>', warning: isLaptop ? 'Laptop: increases heat and reduces battery life.' : '' },
+      ...((si.cpu||'').toLowerCase().includes('amd') ? [] : [{ id:'intel-power-plan', name:'Intel Max Performance Power Plan', desc:'Creates a custom power plan tuned for Intel CPUs — Speed Shift (HWP) on, aggressive boost mode, no C-state idle, all cores active, PCIe and USB suspend off.', icon:'<i class="fa fa-bolt"></i>', warning: isLaptop ? 'Laptop: increases heat and reduces battery life.' : '' }]),
+      ...((si.cpu||'').toLowerCase().includes('intel') ? [] : [{ id:'amd-power-plan', name:'AMD Max Performance Power Plan', desc:'Creates a custom power plan tuned for AMD CPUs — CPPC preferred cores on, aggressive boost mode, no C-state idle, all cores active, PCIe and USB suspend off.', icon:'<i class="fa fa-bolt"></i>', warning: isLaptop ? 'Laptop: increases heat and reduces battery life.' : '' }]),
       { id:'cpu-parking',   name:'Disable CPU Core Parking',         desc:'Forces all CPU cores to stay active. Reduces wake-up latency.', icon:'<i class="fa fa-wrench"></i>', warning: isLaptop ? 'Laptop: drains battery faster.' : '' },
       { id:'cstates',       name:'Disable CPU C-States',              desc:'Prevents CPU from entering low-power idle states. Eliminates frequency transition stutters.', icon:'<i class="fa fa-bolt"></i>', danger:true, dangerLabel:'Confirm', warning: isLaptop ? 'Laptop: may cause overheating on inadequate cooling.' : '' },
       { id:'speed-shift',   name:'Enable Intel Speed Shift (HWP)',    desc:'Autonomous frequency scaling for Intel CPUs. AMD: no effect. 6th gen+: reduces latency.', icon:'<i class="fa fa-wind"></i>' },
@@ -7451,7 +7451,7 @@ function makeCard({ id, name, desc, icon = '<i class="fa fa-gear"></i>', danger 
       <div style="display:flex;align-items:center;gap:6px">
         ${restore ? `<button class="btn btn-ghost btn-sm" onclick="applyTweak('${id}','restore')" title="Restore default"><i class="fa fa-rotate-left"></i></button>` : ''}
         ${danger ? `<label class="toggle-pill" title="${dangerLabel}"><input type="checkbox" id="dt-${id}"><span class="pill-slider"></span></label><span style="font-size:9px;color:var(--warning)"><i class="fa fa-triangle-exclamation"></i></span>` : ''}
-        <label class="tc-toggle" title="${applied ? 'Applied — toggle to restore' : preApplied ? 'Already active — toggle to apply via this tool too' : 'Toggle to apply'}">
+        <label class="tc-toggle" title="${applied ? 'Applied — toggle to restore defaults' : preApplied ? 'Already active on your system — toggle off to restore defaults' : 'Toggle to apply'}">
           <input type="checkbox" id="tct-${id}" ${applied || preApplied ? 'checked' : ''} onchange="applyTweakCard('${id}',this.checked,${danger})">
           <span class="tc-slider"></span>
         </label>
@@ -7490,6 +7490,11 @@ async function applyTweakCard(id, checked, isDanger = false) {
   settings[`tweak_${id}`] = applied ? 'applied' : 'restored'
   await api.saveSettings(settings)
   await api.addChangelogEntry({ id, action }).catch(() => {})
+  if (!applied) {
+    const pfStates = getPreflightStates()
+    delete pfStates[id]
+    localStorage.setItem('pf_tweak_states', JSON.stringify(pfStates))
+  }
 
   const friendly = id.replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase())
   toast(applied ? `Applied: ${friendly}` : `Restored: ${friendly}`, '', applied ? 'ok' : 'info')
