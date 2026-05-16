@@ -6787,26 +6787,23 @@ ipcMain.handle('cpuz-read-timings', async () => {
 })
 
 ipcMain.handle('get-driver-info', async () => {
-  try {
-    const ps = `
+  const r = await runPS(`
 $drivers = Get-CimInstance Win32_PnPSignedDriver |
-  Where-Object { $_.DeviceClass -in @('DISPLAY','NET','MEDIA','SYSTEM') -and $_.Manufacturer -and $_.Manufacturer -ne 'Microsoft' -and $_.Manufacturer -ne '(Standard system devices)' -and $_.DeviceName } |
+  Where-Object { $_.DeviceClass -in @('DISPLAY','NET','MEDIA','SYSTEM') -and
+    $_.Manufacturer -and $_.Manufacturer -ne 'Microsoft' -and
+    $_.Manufacturer -ne '(Standard system devices)' -and $_.DeviceName } |
   Select-Object DeviceName, Manufacturer, DriverVersion, DriverDate, DeviceClass |
   Sort-Object DeviceClass
-$drivers | ConvertTo-Json -Depth 2 -Compress`
-    const out = require('child_process').execSync(
-      `powershell -NoProfile -NonInteractive -Command "${ps.replace(/\n/g,' ').replace(/"/g,'\\"')}"`,
-      { encoding: 'utf8', timeout: 20000 }
-    )
-    let drivers = []
-    try { drivers = JSON.parse(out.trim() || '[]') } catch {}
-    if (!Array.isArray(drivers)) drivers = [drivers]
-    return { ok: true, drivers }
-  } catch (e) { return { ok: false, error: e.message } }
+$drivers | ConvertTo-Json -Depth 2 -Compress
+  `, 15000)
+  let drivers = []
+  try { drivers = JSON.parse(r.out.trim() || '[]') } catch {}
+  if (!Array.isArray(drivers)) drivers = [drivers]
+  return { ok: true, drivers }
 })
 
 ipcMain.handle('run-benchmark', async () => {
-  const ps = `
+  const r = await runPS(`
 $count = 0
 $limit = [DateTime]::Now.AddSeconds(10)
 while ([DateTime]::Now -lt $limit) {
@@ -6816,15 +6813,11 @@ while ([DateTime]::Now -lt $limit) {
     if ($isPrime) { $count++ }
   }
 }
-Write-Output "SCORE=$count"`
-  try {
-    const out = require('child_process').execSync(
-      `powershell -NoProfile -NonInteractive -Command "${ps.replace(/\n/g,' ')}"`,
-      { encoding: 'utf8', timeout: 25000 }
-    )
-    const score = parseInt(out.match(/SCORE=(\d+)/)?.[1] || '0')
-    return { ok: true, score }
-  } catch (e) { return { ok: false, error: e.message } }
+Write-Output "SCORE=$count"
+  `, 25000)
+  const score = parseInt(r.out.match(/SCORE=(\d+)/)?.[1] || '0')
+  if (!score) return { ok: false, error: r.err || 'No score returned' }
+  return { ok: true, score }
 })
 
 ipcMain.handle('get-temps', async () => {

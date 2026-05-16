@@ -1543,6 +1543,21 @@ select.styled-select:focus { border-color: var(--pink); }
   </div>
 </div>
 
+<!-- Advanced Mode Intro Overlay -->
+<div id="advanced-intro-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.85);z-index:7000;align-items:center;justify-content:center;backdrop-filter:blur(6px)">
+  <div style="background:#111;border:1px solid var(--pink);border-radius:14px;padding:28px 32px;width:460px;max-width:92vw;box-shadow:0 24px 60px rgba(0,0,0,0.9);animation:cardIn .3s ease">
+    <div style="font-size:16px;font-weight:700;color:var(--white);margin-bottom:6px"><i class="fa fa-gear" style="color:var(--pink)"></i> Advanced Mode</div>
+    <div style="font-size:11px;color:var(--gray);margin-bottom:18px;line-height:1.7">
+      Advanced mode unlocks extra tools hidden by default. These are for experienced users — use carefully.<br><br>
+      <span style="color:var(--white);font-weight:600">Process Manager</span> <span style="color:#555">—</span> view and terminate running processes<br>
+      <span style="color:var(--white);font-weight:600">Latency Monitor</span> <span style="color:#555">—</span> live DPC/ISR latency chart<br>
+      <span style="color:var(--white);font-weight:600">Ping Test</span> <span style="color:#555">—</span> test latency to game servers worldwide<br>
+      <span style="color:var(--white);font-weight:600">BIOS Tuner</span> <span style="color:#555">—</span> read and modify BIOS/UEFI settings from Windows
+    </div>
+    <button class="btn btn-primary" style="width:100%" onclick="document.getElementById('advanced-intro-overlay').style.display='none'">Got it</button>
+  </div>
+</div>
+
 <!-- Bug Report Overlay -->
 <div id="br-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.85);z-index:7000;align-items:center;justify-content:center;backdrop-filter:blur(6px)" onclick="if(event.target===this)closeBugReport()">
   <div style="background:#111;border:1px solid #1e1e1e;border-radius:14px;padding:28px 32px;width:520px;max-width:92vw;box-shadow:0 24px 60px rgba(0,0,0,0.9);animation:cardIn .3s ease">
@@ -1670,7 +1685,7 @@ select.styled-select:focus { border-color: var(--pink); }
       <button class="nav-btn" data-page="cleanup" data-label="Cleanup" onclick="showPage('cleanup')">
         <span class="nav-icon"><i class="fa fa-broom"></i></span><span class="nav-label">Cleanup</span>
       </button>
-      <button class="nav-btn" data-page="bios-tuner" data-label="BIOS Tuner" onclick="showPage('bios-tuner')">
+      <button class="nav-btn" data-page="bios-tuner" data-label="BIOS Tuner" data-advanced="true" onclick="showPage('bios-tuner')">
         <span class="nav-icon"><i class="fa fa-microchip"></i></span><span class="nav-label">BIOS Tuner</span>
       </button>
       <button class="nav-btn" data-page="ping-test" data-label="Ping Test" data-advanced="true" onclick="showPage('ping-test')">
@@ -2484,6 +2499,15 @@ const THEMES = {
   slate:   { label: 'Slate Gray',   desc: 'Neutral gray — easier on the eyes',
     bg: '#111318', panel: '#14171e', card: '#1a1d26', card2: '#1e212c', dark: '#0e1016', sidebar: '#10131a', border: '#252830',
     accent: '#06B6D4', accentHover: '#0891B2', accentDim: 'rgba(6,182,212,0.12)', accentGlow: 'rgba(6,182,212,0.18)', accentRgb: '6,182,212' },
+  amber:   { label: 'Amber',        desc: 'Warm dark with golden yellow accent',
+    bg: '#0d0b07', panel: '#100e09', card: '#16130b', card2: '#1a170e', dark: '#090807', sidebar: '#0c0a08', border: '#2a2210',
+    accent: '#F59E0B', accentHover: '#D97706', accentDim: 'rgba(245,158,11,0.12)', accentGlow: 'rgba(245,158,11,0.18)', accentRgb: '245,158,11' },
+  rose:    { label: 'Rose',         desc: 'Soft rose pink on near-black',
+    bg: '#0d0909', panel: '#100b0b', card: '#170f0f', card2: '#1c1313', dark: '#090707', sidebar: '#0c0909', border: '#2a1818',
+    accent: '#FB7185', accentHover: '#F43F5E', accentDim: 'rgba(251,113,133,0.12)', accentGlow: 'rgba(251,113,133,0.18)', accentRgb: '251,113,133' },
+  neon:    { label: 'Neon',         desc: 'Electric cyan on deep dark — high contrast',
+    bg: '#060a0d', panel: '#080d11', card: '#0d1318', card2: '#10171d', dark: '#040709', sidebar: '#070b0e', border: '#0f1f28',
+    accent: '#22D3EE', accentHover: '#06B6D4', accentDim: 'rgba(34,211,238,0.12)', accentGlow: 'rgba(34,211,238,0.25)', accentRgb: '34,211,238' },
 }
 
 function applyTheme(themeKey) {
@@ -2539,9 +2563,10 @@ function toggleAdvancedMode() {
   }
   settings.advancedMode = isOn
   api.saveSettings(settings).catch(() => {})
-  // If currently on a hidden-advanced page and Advanced is now OFF, go to dashboard
-  if (!isOn) {
-    const advancedPages = ['latency-monitor', 'ping-test', 'process-manager']
+  if (isOn) {
+    document.getElementById('advanced-intro-overlay').style.display = 'flex'
+  } else {
+    const advancedPages = ['latency-monitor', 'ping-test', 'process-manager', 'bios-tuner']
     if (advancedPages.includes(currentPage)) showPage('dashboard')
   }
 }
@@ -2553,7 +2578,7 @@ function buildPersonalization(c) {
       <div class="section-head"><span class="section-accent"></span><span class="section-title">Theme</span></div>
       <div class="section-body">
         <div style="font-size:11px;color:var(--gray);margin-bottom:12px">Choose a full theme — changes background colors and accent color together.</div>
-        <div class="theme-grid" id="theme-grid" style="grid-template-columns:repeat(3,1fr)"></div>
+        <div class="theme-grid" id="theme-grid" style="grid-template-columns:repeat(4,1fr)"></div>
       </div>
     </div>
   </div>`
@@ -7156,6 +7181,11 @@ function buildWindowsOpti(c) {
 function buildHardware(c) {
   const si = sysInfo
   const isLaptop = si.isLaptop
+  const gpu = (si.gpu || '').toLowerCase()
+  const cpu = (si.cpu || '').toLowerCase()
+  const isNvidia = /nvidia|geforce|rtx|gtx/.test(gpu)
+  const isAmd    = /amd|radeon|\brx\b/.test(gpu)
+  const isIntel  = cpu.includes('intel')
 
   const warn = document.createElement('div')
   warn.className = 'hw-warn-banner'
@@ -7163,38 +7193,40 @@ function buildHardware(c) {
   c.appendChild(warn)
 
   const SECTIONS = [
-    { title:'NVIDIA GPU', sub:'Registry-level GPU performance tuning', cards:[
+    ...(isNvidia ? [{ title:'NVIDIA GPU', sub:'Registry-level GPU performance tuning', cards:[
       { id:'nvidia-max-perf',    name:'Force Maximum Performance Mode', desc:'Sets PowerMizerLevel=1 in GPU class registry. Keeps GPU at max clocks at all times. Reboot required.', icon:'<i class="fa fa-gamepad"></i>' },
       { id:'nvidia-low-latency', name:'NVIDIA Ultra Low-Latency Mode',  desc:'Sets D3PCLatency=1, F1MaxLatency=0 — equivalent to "Ultra" in NVIDIA Control Panel.', icon:'<i class="fa fa-bolt"></i>' },
       { id:'disable-hdcp',       name:'Disable HDCP (DRM overhead)',    desc:'May break HDMI audio on some monitors. Reboot required.', icon:'<i class="fa fa-lock-open"></i>', danger:true, dangerLabel:'Confirm HDCP off' },
-    ]},
+    ]}] : []),
     { title:'Power Plan', cards:[
       ...((si.cpu||'').toLowerCase().includes('amd') ? [] : [{ id:'intel-power-plan', name:'Intel Max Performance Power Plan', desc:'Creates a custom power plan tuned for Intel CPUs — Speed Shift (HWP) on, aggressive boost mode, no C-state idle, all cores active, PCIe and USB suspend off.', icon:'<i class="fa fa-bolt"></i>', warning: isLaptop ? 'Laptop: increases heat and reduces battery life.' : '' }]),
       ...((si.cpu||'').toLowerCase().includes('intel') ? [] : [{ id:'amd-power-plan', name:'AMD Max Performance Power Plan', desc:'Creates a custom power plan tuned for AMD CPUs — CPPC preferred cores on, aggressive boost mode, no C-state idle, all cores active, PCIe and USB suspend off.', icon:'<i class="fa fa-bolt"></i>', warning: isLaptop ? 'Laptop: increases heat and reduces battery life.' : '' }]),
       { id:'cpu-parking',   name:'Disable CPU Core Parking',         desc:'Forces all CPU cores to stay active. Reduces wake-up latency.', icon:'<i class="fa fa-wrench"></i>', warning: isLaptop ? 'Laptop: drains battery faster.' : '' },
       { id:'cstates',       name:'Disable CPU C-States',              desc:'Prevents CPU from entering low-power idle states. Eliminates frequency transition stutters.', icon:'<i class="fa fa-bolt"></i>', danger:true, dangerLabel:'Confirm', warning: isLaptop ? 'Laptop: may cause overheating on inadequate cooling.' : '' },
-      { id:'speed-shift',   name:'Enable Intel Speed Shift (HWP)',    desc:'Autonomous frequency scaling for Intel CPUs. AMD: no effect. 6th gen+: reduces latency.', icon:'<i class="fa fa-wind"></i>' },
+      ...(isIntel ? [{ id:'speed-shift', name:'Enable Intel Speed Shift (HWP)', desc:'Autonomous frequency scaling for Intel CPUs. 6th gen+: reduces frequency transition latency.', icon:'<i class="fa fa-wind"></i>' }] : []),
       { id:'pcie-power',    name:'Disable PCIe Link State Power Management', desc:'Stops the PCIe bus power-cycling your GPU and NVMe between transitions. Eliminates the latency spikes caused by waking them back up. Applies to both AC and DC.', icon:'<i class="fa fa-plug-circle-bolt"></i>', warning: isLaptop ? 'Laptop: increases battery drain.' : '' },
     ]},
     { title:'Storage', cards:[
       { id:'nvme-latency', name:'NVMe StorPort Latency Tweak', desc:'Disables performance timer and BusyPauseTime in StorPort driver. Reduces random read latency.', icon:'<i class="fa fa-hard-drive"></i>', warning: !si.nvme ? 'No NVMe SSD detected — tweak may not apply.' : '' },
     ]},
     { title:'GPU Advanced', cards:[
-      { id:'gpu-hags-off',       name:'GPU HAGS Off (Hardware Accelerated GPU Scheduling)', desc:'Disables HAGS (WDDM 3.0 hardware scheduling). Some games perform better with HAGS off — eliminates scheduling overhead on older drivers.', icon:'<i class="fa fa-display"></i>', danger:true, dangerLabel:'Confirm', warning:'Disables a Windows 10+ performance feature. Only beneficial on specific GPU/driver combos — test before keeping.' },
-      { id:'nvidia-pstate-lock', name:'NVIDIA P-State Lock (P0 always)', desc:'Forces NVIDIA GPU to stay in P0 (maximum performance state) at all times via registry. Eliminates boost-clock ramp-up latency.', icon:'<i class="fa fa-trophy"></i>' },
-      { id:'nvidia-profile',     name:'NVIDIA Profile Optimiser', desc:'Applies low-latency, maximum performance and pre-rendered frames settings to the NVIDIA global driver profile via registry.', icon:'<i class="fa fa-sliders"></i>' },
-      { id:'hvci-offload',       name:'HVCI Offload (Hypervisor Code Integrity)', desc:'Enables HVCI offload mode — moves kernel integrity checks to the hypervisor instead of real-time inline. Reduces overhead on Virtualization-Based Security.', icon:'<i class="fa fa-server"></i>', danger:true, dangerLabel:'Confirm', warning:'Modifies VBS/HVCI policy. Reboot required. Revert before troubleshooting boot issues.' },
+      { id:'gpu-hags-off', name:'GPU HAGS Off (Hardware Accelerated GPU Scheduling)', desc:'Disables HAGS (WDDM 3.0 hardware scheduling). Some games perform better with HAGS off — eliminates scheduling overhead on older drivers.', icon:'<i class="fa fa-display"></i>', danger:true, dangerLabel:'Confirm', warning:'Disables a Windows 10+ performance feature. Only beneficial on specific GPU/driver combos — test before keeping.' },
+      ...(isNvidia ? [
+        { id:'nvidia-pstate-lock', name:'NVIDIA P-State Lock (P0 always)', desc:'Forces NVIDIA GPU to stay in P0 (maximum performance state) at all times via registry. Eliminates boost-clock ramp-up latency.', icon:'<i class="fa fa-trophy"></i>' },
+        { id:'nvidia-profile',     name:'NVIDIA Profile Optimiser', desc:'Applies low-latency, maximum performance and pre-rendered frames settings to the NVIDIA global driver profile via registry.', icon:'<i class="fa fa-sliders"></i>' },
+      ] : []),
+      { id:'hvci-offload', name:'HVCI Offload (Hypervisor Code Integrity)', desc:'Enables HVCI offload mode — moves kernel integrity checks to the hypervisor instead of real-time inline. Reduces overhead on Virtualization-Based Security.', icon:'<i class="fa fa-server"></i>', danger:true, dangerLabel:'Confirm', warning:'Modifies VBS/HVCI policy. Reboot required. Revert before troubleshooting boot issues.' },
     ]},
     { title:'Memory & Mitigations', cards:[
       { id:'memory-guard-tune',    name:'Memory Guard Tune', desc:'Sets MoveImages and MemoryPressureResponse policies to optimise kernel memory pressure handling and ASLR image placement.', icon:'<i class="fa fa-memory"></i>' },
       { id:'full-mitigation-wipe', name:'Full Mitigation Wipe', desc:'Sets all process mitigations via ProcessMitigationOptions2 to disabled. Maximum FPS gain — removes nearly all kernel security mitigations.', icon:'<i class="fa fa-triangle-exclamation"></i>', danger:true, dangerLabel:'I accept ALL risks', warning:'DANGEROUS: Disables nearly all kernel and process mitigations including ASLR, CFG, CET, DEP extensions. Never on a shared or internet-exposed PC.' },
       { id:'process-count-reduction', name:'Process Count Reduction', desc:'Disables non-essential Windows services (sysmain, diagsvc, dmwappushservice) to reduce total running process count and free RAM.', icon:'<i class="fa fa-list-check"></i>' },
     ]},
-    { title:'AMD GPU', cards:[
+    ...(isAmd ? [{ title:'AMD GPU', cards:[
       { id:'amd-chill-off',    name:'AMD Chill Off', desc:'Disables AMD Chill (dynamic frame rate limiter) in the registry. Prevents AMD ReLive from throttling frame rate when the mouse is still.', icon:'<i class="fa fa-snowflake"></i>' },
       { id:'amd-power-hold',   name:'AMD Power Hold (Max performance state)', desc:'Sets AMD GPU power state to always stay at maximum clock via registry. Prevents downclocking during GPU-light scenes.', icon:'<i class="fa fa-fire"></i>' },
       { id:'amd-service-trim', name:'AMD Service Trim', desc:'Stops and disables non-essential AMD background services (AMDLinkUpdate, AMD Crash Defender, AMD Ryzen Master SDK) that consume CPU idle time.', icon:'<i class="fa fa-scissors"></i>' },
-    ]},
+    ]}] : []),
     { title:'Audio', cards:[
       { id:'corsair-audio-off', name:'Corsair iCUE Audio Off', desc:'Disables Corsair iCUE audio routing services that intercept Windows audio. Reduces audio latency for non-iCUE users. No effect if iCUE is not installed.', icon:'<i class="fa fa-headphones"></i>' },
     ]},
