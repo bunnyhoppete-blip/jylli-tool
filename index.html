@@ -2860,6 +2860,7 @@ async function autoHealthCheck() {
   try {
     const result = await api.runTweakHealth()
     if (!result || result.reverted.length === 0) return
+    if (settings.healthSnoozedUntil && Date.now() < settings.healthSnoozedUntil) return
     const names = result.reverted.map(id => {
       const tw = SEARCH_INDEX?.find?.(t => t.id === id)
       return tw?.name || id
@@ -2871,7 +2872,14 @@ async function autoHealthCheck() {
       okStyle: 'warning',
       icon: 'fa-rotate-left'
     }).catch(() => null)
-    if (confirmed !== null) await reapplyReverted(result.reverted)
+    if (confirmed !== null) {
+      await reapplyReverted(result.reverted)
+      settings.healthSnoozedUntil = Date.now() + 86400000
+      api.saveSettings(settings)
+    } else {
+      settings.healthSnoozedUntil = Date.now() + 14400000
+      api.saveSettings(settings)
+    }
   } catch {}
 }
 
@@ -7070,7 +7078,7 @@ function aomBuildTweakList() {
     { id:'game-dvr',        icon:'fa-gamepad',        cat:'Gaming',     label:'Disable Game DVR / Xbox recording',           safe:true },
     { id:'disable-fso',     icon:'fa-display',        cat:'Gaming',     label:'Disable Fullscreen Optimizations',             safe:true },
     { id:'mmcss',           icon:'fa-music',          cat:'CPU',        label:'MMCSS GPU Priority=8, Games scheduling=High',  safe:true },
-    { id:'gpu-hwsch',       icon:'fa-palette',        cat:'GPU',        label:'Enable GPU Hardware Scheduling (WDDM 2.7)',     safe:true },
+    { id:'gpu-hwsch',       icon:'fa-palette',        cat:'GPU',        label:'Enable GPU Hardware Scheduling (WDDM 2.7)',     safe: (() => { const g = (si.gpu||'').toLowerCase(); return g.includes('nvidia')||g.includes('rtx')||g.includes('gtx')||g.includes('rx 6')||g.includes('rx 7')||g.includes('rx 9')||g.includes('arc') })(), skipReason: 'Skipped — GPU not confirmed HWSCH-compatible' },
     { id:'priority-sep',    icon:'fa-arrow-trend-up', cat:'CPU',        label:'Foreground process priority boost',            safe:true },
     { id:'visual-effects',  icon:'fa-eye-slash',      cat:'UI',         label:'Visual Effects → Best Performance',           safe:true },
     { id:'explorer-perf',   icon:'fa-folder-open',    cat:'UI',         label:'Optimise Windows Explorer startup',            safe:true },
@@ -7094,6 +7102,7 @@ function aomBuildTweakList() {
     { id:'nic-interrupt-mod',icon:'fa-plug',          cat:'Network',    label:'Disable NIC interrupt moderation',             safe: !si.isWifi, skipReason: 'Skipped — Wi-Fi detected' },
     { id:'nic-flow-control',icon:'fa-plug',           cat:'Network',    label:'Disable NIC flow control',                    safe: !si.isWifi, skipReason: 'Skipped — Wi-Fi detected' },
     { id:'nic-energy-efficient',icon:'fa-plug',       cat:'Network',    label:'Disable Energy Efficient Ethernet',            safe: !si.isWifi, skipReason: 'Skipped — Wi-Fi detected' },
+    { id:'nic-offloads',      icon:'fa-plug',           cat:'Network',    label:'Disable NIC hardware offloads (checksum/LSO/RSC)', safe: !si.isWifi, skipReason: 'Skipped — Wi-Fi detected' },
     { id:'search-box-local',icon:'fa-magnifying-glass',cat:'Privacy',   label:'Search box local only (no Bing)',             safe:true },
     { id:'search-cloud-off',icon:'fa-cloud',          cat:'Privacy',    label:'Disable cloud search suggestions',             safe:true },
     { id:'telemetry',       icon:'fa-satellite-dish', cat:'Privacy',    label:'Disable Windows telemetry (AllowTelemetry=1)', safe:true },

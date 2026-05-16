@@ -1984,15 +1984,30 @@ function buildAutoOptiSteps(si) {
   })
 
   if (!si?.isLaptop) {
-    add('Apply CPU-specific max performance power plan', async (s, ps, _, cmd) => {
+    add('Apply CPU-specific max performance power plan', async (s, ps, cmd) => {
       const cpuR = await ps('(Get-CimInstance Win32_Processor | Select-Object -First 1).Name')
       const cpuName = cpuR.out.trim()
       const isAMD = cpuName.toLowerCase().includes('amd')
       const isIntel = cpuName.toLowerCase().includes('intel')
       if (!isAMD && !isIntel) { s(`Unknown CPU: ${cpuName} — skipping power plan.`, 'warn'); return }
-      const r = await cmd('powercfg -duplicatescheme e9a42b02-d5df-448d-aa00-03f14749eb61')
-      const m = r.out.match(/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})/i)
-      if (!m) { s('Could not create power plan.', 'warn'); return }
+      const GUID_RX = /([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})/i
+      let r, m
+      for (const scheme of ['e9a42b02-d5df-448d-aa00-03f14749eb61', '8c5e7fda-e8bf-4a96-9a85-a6e23a8c635c']) {
+        r = await cmd(`powercfg -duplicatescheme ${scheme}`)
+        m = r.out.match(GUID_RX)
+        if (m) break
+      }
+      if (!m) {
+        const active = await cmd('powercfg /getactivescheme')
+        const activeGuid = active.out.match(GUID_RX)?.[1]
+        if (activeGuid) { r = await cmd(`powercfg -duplicatescheme ${activeGuid}`); m = r.out.match(GUID_RX) }
+      }
+      if (!m) {
+        await cmd('powercfg /restoredefaultschemes')
+        r = await cmd('powercfg -duplicatescheme e9a42b02-d5df-448d-aa00-03f14749eb61')
+        m = r.out.match(GUID_RX)
+      }
+      if (!m) { s('Could not create power plan — power settings may be locked by group policy.', 'warn'); return }
       const g = m[1]
       if (isIntel) {
         await cmd(`powercfg /changename ${g} "Intel Max Performance" "Jylli Tool - Intel-optimised max performance plan"`)
@@ -2002,16 +2017,21 @@ function buildAutoOptiSteps(si) {
         await cmd(`powercfg /setacvalueindex ${g} SUB_PROCESSOR CPPCENABLED 1`)
       }
       await cmd(`powercfg /setacvalueindex ${g} SUB_PROCESSOR PERFBOOSTMODE 2`)
+      await cmd(`powercfg /setacvalueindex ${g} SUB_PROCESSOR PERFEPP 0`)
+      await cmd(`powercfg /setacvalueindex ${g} SUB_PROCESSOR PERFBOOSTPOL 100`)
+      await cmd(`powercfg /setacvalueindex ${g} SUB_PROCESSOR SCHEDPOL 0`)
       await cmd(`powercfg /setacvalueindex ${g} SUB_PROCESSOR PROCTHROTTLEMIN 100`)
       await cmd(`powercfg /setacvalueindex ${g} SUB_PROCESSOR PROCTHROTTLEMAX 100`)
       await cmd(`powercfg /setacvalueindex ${g} SUB_PROCESSOR IDLEPROMOTE 0`)
       await cmd(`powercfg /setacvalueindex ${g} SUB_PROCESSOR IDLEDEMOTE 0`)
       await cmd(`powercfg /setacvalueindex ${g} SUB_PROCESSOR IDLETIME 0`)
       await cmd(`powercfg /setacvalueindex ${g} SUB_PROCESSOR CPMINCORES 100`)
+      await cmd(`powercfg /setacvalueindex ${g} SUB_SLEEP STANDBYIDLE 0`)
+      await cmd(`powercfg /setacvalueindex ${g} SUB_SLEEP HYBRIDSLEEP 0`)
       await cmd(`powercfg /setacvalueindex ${g} 501a4d13-42af-4429-9ac1-df54c6bf3fc2 ee12f906-d277-404b-b6da-e5fa1a576df5 0`)
       await cmd(`powercfg /setacvalueindex ${g} 2a737441-1930-4402-8d77-b2bebba308a3 48e6b7a6-50f5-4782-a5d4-53bb8f07e226 0`)
       await cmd(`powercfg -setactive ${g}`)
-      s(`${isIntel ? 'Intel' : 'AMD'} Max Performance plan activated.`, 'ok')
+      s(`${isIntel ? 'Intel' : 'AMD'} Max Performance plan activated — EPP=0, full boost, no idle/sleep.`, 'ok')
     })
   }
 
@@ -5102,6 +5122,12 @@ ipcMain.handle('clean-power-plans', async () => {
 
 // What's New content
 const WHATS_NEW = [
+  { version: '1.4.2', date: 'May 2026', items: [
+    'Tweak Health Check — no longer nags on every launch: after clicking Re-apply the prompt is snoozed for 24 hours; after clicking Cancel it is snoozed for 4 hours. Windows Update genuinely resets certain tweaks on every boot — this prevents the endless nag loop.',
+    'Auto-Optimize — GPU Hardware Scheduling (WDDM 2.7) is now skipped for unsupported GPUs (old AMD, integrated Intel) instead of being applied unconditionally; prevents potential instability on incompatible hardware.',
+    'Auto-Optimize — NIC hardware offloads tweak (checksum, LSO, RSC disable) is now included in the wizard for Ethernet users; was previously only available as a manual tweak on the Network page.',
+    'Auto-Optimize (legacy path) — max performance power plan now uses the same full 4-step fallback chain and full settings (EPP=0, boost policy, no idle/sleep) as the individual Intel/AMD power plan tweaks.',
+  ]},
   { version: '1.4.1', date: 'May 2026', items: [
     'Tweak Health Check — fixed: 5 tweaks (TDR Delay, NVMe Latency, Disable NetBIOS, Disable Background Apps, Disable HDCP) were always falsely reported as reverted by Windows even right after applying; health check now verifies the correct registry keys',
     'Tweak Health Check — WPAD tweak removed from health check (it controls a Windows service, not a registry key, so cannot be verified this way)',
