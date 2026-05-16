@@ -1880,8 +1880,9 @@ async function createRestorePointInternal(send) {
     return { ok: true }
   }
   const reason = out.replace('RP_FAIL:', '') || r.err || 'Unknown error'
-  send(`✗ Restore Point FAILED: ${reason}`, 'err')
-  return { ok: false, reason }
+  send(`⚠ Restore Point skipped: ${reason}`, 'warn')
+  send('  System Restore may be disabled on this PC — tweaks will still be applied.', 'info')
+  return { ok: true, skipped: true }
 }
 
 function buildAutoOptiSteps(si) {
