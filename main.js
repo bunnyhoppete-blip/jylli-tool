@@ -1188,6 +1188,15 @@ ipcMain.handle('get-system-info', async () => {
   if (info.gpu)      getSystemFields._cachedGpu      = info.gpu
   if (info.isLaptop) getSystemFields._cachedIsLaptop = info.isLaptop
   if (info.isWifi)   getSystemFields._cachedIsWifi   = info.isWifi
+
+  // Clean up stale cross-brand power plan settings — prevents wrong card showing PRE-APPLIED
+  const cpu = (info.cpu || '').toLowerCase()
+  const saved = loadSettings()
+  let settingsDirty = false
+  if (cpu.includes('intel') && saved['tweak_amd-power-plan']) { delete saved['tweak_amd-power-plan']; settingsDirty = true }
+  if (cpu.includes('amd')   && saved['tweak_intel-power-plan']) { delete saved['tweak_intel-power-plan']; settingsDirty = true }
+  if (settingsDirty) fs.writeFileSync(SETTINGS_PATH, JSON.stringify(saved, null, 2))
+
   return info
 })
 
@@ -4966,9 +4975,13 @@ ipcMain.handle('run-preflight-scan', async () => {
   // Also mark any tweak the user applied via this tool as active
   // (registry scan may miss some tweaks that were applied correctly)
   const savedSettings = loadSettings()
+  const sysCpu = (cachedSysInfo?.cpu || '').toLowerCase()
   for (const [key, val] of Object.entries(savedSettings)) {
     if (key.startsWith('tweak_') && val === 'applied') {
       const id = key.replace('tweak_', '')
+      // Skip cross-brand power plan entries — prevent wrong card showing PRE-APPLIED
+      if (id === 'intel-power-plan' && sysCpu && !sysCpu.includes('intel')) continue
+      if (id === 'amd-power-plan'   && sysCpu && !sysCpu.includes('amd'))   continue
       tweakStates[id] = true
     }
   }
@@ -5009,12 +5022,17 @@ try {
 
   const sendLog = (msg) => mainWindow?.webContents.send('log', { msg, level: 'info', ts: new Date().toLocaleTimeString() })
 
-  autoUpdater.on('checking-for-update',  ()     => sendLog('Updater: checking for updates…'))
-  autoUpdater.on('update-available',     (info) => { sendLog(`Updater: update v${info.version} available`); mainWindow?.webContents.send('update-available', info) })
-  autoUpdater.on('update-not-available', ()     => sendLog('Updater: already on latest version'))
+  autoUpdater.on('checking-for-update',  ()     => {}) // silent — no need to show in output log
+  autoUpdater.on('update-available',     (info) => { sendLog(`Update available: v${info.version} — click "Update" to download`); mainWindow?.webContents.send('update-available', info) })
+  autoUpdater.on('update-not-available', ()     => {}) // silent
   autoUpdater.on('download-progress',    (p)    => mainWindow?.webContents.send('update-progress', p))
   autoUpdater.on('update-downloaded',    (info) => mainWindow?.webContents.send('update-downloaded', info))
-  autoUpdater.on('error',                (err)  => sendLog(`Updater error: ${err?.message}`))
+  autoUpdater.on('error', (err) => {
+    // Suppress routine network errors (offline, rate-limited, 404) — these flood the output log
+    const msg = err?.message || ''
+    if (msg.includes('net::') || msg.includes('HttpError') || msg.includes('404') || msg.includes('ERR_')) return
+    sendLog(`Updater: ${msg}`)
+  })
 } catch (e) {
   // electron-updater not available
 }
