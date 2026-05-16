@@ -2,3 +2,5 @@ node_modules/
 dist/
 *.log
 .claude/
+bot.js
+bot-state.json

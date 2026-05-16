@@ -6,6 +6,14 @@ const os = require('os')
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 const IS_WIN = process.platform === 'win32'
+
+// Resolve paths to bundled native executables — these are unpacked from asar
+function assetPath(...parts) {
+  const base = app.isPackaged
+    ? path.join(process.resourcesPath, 'app.asar.unpacked')
+    : __dirname
+  return path.join(base, ...parts)
+}
 let SETTINGS_PATH = null
 let LOG_PATH = null
 
@@ -31,6 +39,7 @@ let discordTweaksApplied  = 0
 let discordHasFiveM       = false
 let discordPulseGame      = null   // name of game Pulse is active for, or null
 let discordActiveGame     = null   // game watcher detected game, or null
+let cachedSysInfo         = null   // cached after first get-system-info call, used by Pulse
 
 // Override state for active operations (null = idle, use page-based presence)
 let discordActivityOverride = null   // { details, state, imageKey, imageText }
@@ -472,6 +481,26 @@ ipcMain.handle('submit-bug-report', (_, data) => {
 process.on('uncaughtException',  (err) => { webhookError('crash', err) })
 process.on('unhandledRejection', (err) => { webhookError('unhandledRejection', err) })
 
+// ─── LibreHardwareMonitor lifecycle ──────────────────────────────────────────
+let _lhmProcess = null
+function startLhm() {
+  const lhmExe = assetPath('assets', 'lhm', 'LibreHardwareMonitor.exe')
+  if (!fs.existsSync(lhmExe)) return
+  try {
+    _lhmProcess = spawn(lhmExe, [], {
+      cwd: assetPath('assets', 'lhm'),
+      detached: false,
+      windowsHide: true,
+      stdio: 'ignore'
+    })
+    _lhmProcess.unref()
+  } catch {}
+}
+function stopLhm() {
+  if (_lhmProcess) { try { _lhmProcess.kill() } catch {} ; _lhmProcess = null }
+  try { require('child_process').execSync('taskkill /f /im LibreHardwareMonitor.exe', { stdio: 'ignore' }) } catch {}
+}
+
 // ─── Window ───────────────────────────────────────────────────────────────────
 function createWindow() {
   mainWindow = new BrowserWindow({
@@ -646,10 +675,35 @@ app.whenReady().then(() => {
   CHANGELOG_PATH = path.join(userData, 'jt_changelog.json')
   APP_VERSION    = app.getVersion()
   createWindow(); createTray(); initDiscordRPC(); webhookLaunch()
+  startLhm()
 })
 app.on('window-all-closed', () => { /* stay alive in tray */ })
+
+// Re-enforce USB selective suspend after sleep/wake — Windows resets per-device state on resume
+const { powerMonitor } = require('electron')
+powerMonitor.on('resume', async () => {
+  try {
+    const raw = fs.existsSync(SETTINGS_PATH) ? fs.readFileSync(SETTINGS_PATH, 'utf8') : '{}'
+    const saved = JSON.parse(raw)
+    const usbActive = saved['usb-suspend'] === 'applied' || saved['usb-power-guard'] === 'applied'
+    if (!usbActive) return
+    await new Promise((resolve, reject) => {
+      const ps = spawn('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', `
+        $hubs = Get-ChildItem 'HKLM:\\SYSTEM\\CurrentControlSet\\Enum\\USB' -EA SilentlyContinue | Get-ChildItem -EA SilentlyContinue
+        foreach ($dev in $hubs) {
+          $pp = Join-Path $dev.PSPath 'Device Parameters'
+          if (Test-Path $pp) { Set-ItemProperty -Path $pp -Name SelectiveSuspendEnabled -Value 0 -Force -EA SilentlyContinue }
+          Set-ItemProperty -Path $dev.PSPath -Name EnhancedPowerManagementEnabled -Value 0 -Force -EA SilentlyContinue
+        }
+      `], { windowsHide: true })
+      ps.on('close', resolve)
+      ps.on('error', reject)
+    })
+  } catch {}
+})
 app.on('will-quit', (e) => {
   e.preventDefault()
+  stopLhm()
   const duration = Date.now() - sessionStartTime
   if (duration > 10000) webhookSessionEnd(duration, sessionPageVisits, sessionTweaksCount)
   // Await clearActivity so Discord status is actually removed before the process exits
@@ -1039,6 +1093,8 @@ $nicPh = Get-CimInstance Win32_NetworkAdapter | Where-Object { $_.Name -eq $nic.
 $gpu   = Get-CimInstance Win32_VideoController | Select-Object -First 1
 $ram   = Get-CimInstance Win32_PhysicalMemory | Select-Object -First 1
 $sys   = Get-CimInstance Win32_ComputerSystem
+$disp  = Get-CimInstance Win32_VideoController | Where-Object { $_.CurrentHorizontalResolution -gt 0 } | Select-Object -First 1
+$disk  = Get-CimInstance Win32_DiskDrive | Sort-Object Size -Descending | Select-Object -First 1
 Write-Output "CPU_THREADS=$($cpu.NumberOfLogicalProcessors)"
 Write-Output "OS_CAPTION=$($os.Caption)"
 Write-Output "NIC_NAME=$($nic.Description)"
@@ -1048,6 +1104,10 @@ Write-Output "RAM_SPEED=$($ram.Speed)"
 Write-Output "RAM_TYPE=$($ram.MemoryType)"
 Write-Output "COMP_NAME=$($sys.DNSHostName)"
 Write-Output "DOMAIN=$($sys.PartOfDomain)"
+Write-Output "DISPLAY_RES=$($disp.CurrentHorizontalResolution)x$($disp.CurrentVerticalResolution)"
+Write-Output "DISPLAY_REFRESH=$($disp.CurrentRefreshRate)"
+Write-Output "DISK_MODEL=$($disk.Model)"
+Write-Output "DISK_SIZE_GB=$([math]::Round($disk.Size / 1GB, 0))"
 `)
     for (const line of extraR.out.split('\n')) {
       const [key, ...rest] = line.trim().split('=')
@@ -1063,6 +1123,10 @@ Write-Output "DOMAIN=$($sys.PartOfDomain)"
         info.ramType = types[parseInt(val)] || ''
       }
       if (key === 'COMP_NAME' && val) info.computerName = val
+      if (key === 'DISPLAY_RES' && val && val !== 'x') info.displayRes = val
+      if (key === 'DISPLAY_REFRESH' && parseInt(val)) info.displayRefresh = parseInt(val)
+      if (key === 'DISK_MODEL' && val) info.diskModel = val
+      if (key === 'DISK_SIZE_GB' && parseInt(val)) info.diskSizeGB = parseInt(val)
     }
     // Build ramSpec string: "2×DDR5-5600 · 32 GB" style
     if (info.ramType && info.ramHz) {
@@ -1119,6 +1183,7 @@ Write-Output "DOMAIN=$($sys.PartOfDomain)"
 ipcMain.handle('get-app-version', () => APP_VERSION)
 ipcMain.handle('get-system-info', async () => {
   const info = await detectSystemInfo()
+  cachedSysInfo = info
   // Cache fields for webhook use (webhookLaunch fires before detectSystemInfo completes)
   if (info.gpu)      getSystemFields._cachedGpu      = info.gpu
   if (info.isLaptop) getSystemFields._cachedIsLaptop = info.isLaptop
@@ -1238,7 +1303,6 @@ ipcMain.handle('run-tweak', async (_, { id, action }) => {
 
 // ─── Real-time metrics ────────────────────────────────────────────────────────
 let _netPrevBytes = null
-let _cpuTempFailed = false  // skip expensive WMI calls after confirmed unavailable
 ipcMain.handle('get-metrics', async () => {
   const metrics = {
     cpu: 0, ram: 0, ramUsed: 0, ramTotal: 0,
@@ -1248,7 +1312,7 @@ ipcMain.handle('get-metrics', async () => {
     cpuTemp: 0, gpuTemp: 0
   }
 
-  const cpuTempScript = _cpuTempFailed ? `Write-Output "CPU_TEMP=-1"` : `
+  const cpuTempScript = `
 $cpu_temp = -1
 # LibreHardwareMonitor WMI (most accurate, if running)
 try {
@@ -1326,7 +1390,6 @@ Write-Output "NET_SB=$net_sb"
   metrics.uptime    = Math.round(kn('UPTIME'))
   metrics.processes = Math.round(kn('PROCS'))
   const rawCpuTemp = parseFloat(kv['CPU_TEMP'])
-  if (rawCpuTemp === -1) _cpuTempFailed = true
   metrics.cpuTemp = (rawCpuTemp > 0) ? rawCpuTemp : 0
   const netRb = kn('NET_RB'), netSb = kn('NET_SB')
   if (_netPrevBytes && netRb > 0) {
@@ -2368,16 +2431,38 @@ const TWEAKS = {
     }
   },
   'usb-suspend': {
-    apply: async (s, _, cmd) => {
+    apply: async (s, ps, cmd) => {
       await cmd('powercfg /setacvalueindex SCHEME_CURRENT 2a737441-1930-4402-8d77-b2bebba308a3 48e6b7a6-50f5-4782-a5d4-53bb8f07e226 0')
       await cmd('powercfg /setdcvalueindex SCHEME_CURRENT 2a737441-1930-4402-8d77-b2bebba308a3 48e6b7a6-50f5-4782-a5d4-53bb8f07e226 0')
       await cmd('powercfg /setactive SCHEME_CURRENT')
-      s('USB Selective Suspend disabled. No more USB stutter or disconnects.', 'ok')
+      // Per-device selective suspend — survives sleep/wake and monitor transitions
+      // powercfg alone resets on wake; device-level EnhancedPowerManagementEnabled=0 does not
+      await ps(`
+        $hubs = Get-ChildItem 'HKLM:\\SYSTEM\\CurrentControlSet\\Enum\\USB' -EA SilentlyContinue | Get-ChildItem -EA SilentlyContinue
+        foreach ($dev in $hubs) {
+          $pp = Join-Path $dev.PSPath 'Device Parameters'
+          if (Test-Path $pp) {
+            Set-ItemProperty -Path $pp -Name SelectiveSuspendEnabled -Value 0 -Force -EA SilentlyContinue
+          }
+          Set-ItemProperty -Path $dev.PSPath -Name EnhancedPowerManagementEnabled -Value 0 -Force -EA SilentlyContinue
+        }
+      `)
+      s('USB Selective Suspend disabled (power plan + per-device). Survives sleep/wake.', 'ok')
     },
-    restore: async (s, _, cmd) => {
+    restore: async (s, ps, cmd) => {
       await cmd('powercfg /setacvalueindex SCHEME_CURRENT 2a737441-1930-4402-8d77-b2bebba308a3 48e6b7a6-50f5-4782-a5d4-53bb8f07e226 1')
       await cmd('powercfg /setdcvalueindex SCHEME_CURRENT 2a737441-1930-4402-8d77-b2bebba308a3 48e6b7a6-50f5-4782-a5d4-53bb8f07e226 1')
       await cmd('powercfg /setactive SCHEME_CURRENT')
+      await ps(`
+        $hubs = Get-ChildItem 'HKLM:\\SYSTEM\\CurrentControlSet\\Enum\\USB' -EA SilentlyContinue | Get-ChildItem -EA SilentlyContinue
+        foreach ($dev in $hubs) {
+          $pp = Join-Path $dev.PSPath 'Device Parameters'
+          if (Test-Path $pp) {
+            Remove-ItemProperty -Path $pp -Name SelectiveSuspendEnabled -EA SilentlyContinue
+          }
+          Remove-ItemProperty -Path $dev.PSPath -Name EnhancedPowerManagementEnabled -EA SilentlyContinue
+        }
+      `)
       s('USB Selective Suspend restored.', 'ok')
     }
   },
@@ -4023,11 +4108,32 @@ if ($r.Count -eq 0) { Write-Output "NONE_FOUND" } else { foreach ($x in $r) { Wr
       await cmd('powercfg /setdcvalueindex SCHEME_CURRENT 2a737441-1930-4402-8d77-b2bebba308a3 48e6b7a6-50f5-4782-a5d4-53bb8f07e226 0')
       await cmd('powercfg /setactive SCHEME_CURRENT')
       await ps('Set-ItemProperty -Path "HKLM:\\SYSTEM\\CurrentControlSet\\Services\\usb" -Name DisableSelectiveSuspend -Value 1 -Force -EA SilentlyContinue')
-      s('USB Power Guard applied — selective suspend off, root hub idle disabled. Eliminates input lag spikes.', 'ok')
+      // Per-device selective suspend — survives sleep/wake and monitor transitions
+      await ps(`
+        $hubs = Get-ChildItem 'HKLM:\\SYSTEM\\CurrentControlSet\\Enum\\USB' -EA SilentlyContinue | Get-ChildItem -EA SilentlyContinue
+        foreach ($dev in $hubs) {
+          $pp = Join-Path $dev.PSPath 'Device Parameters'
+          if (Test-Path $pp) {
+            Set-ItemProperty -Path $pp -Name SelectiveSuspendEnabled -Value 0 -Force -EA SilentlyContinue
+          }
+          Set-ItemProperty -Path $dev.PSPath -Name EnhancedPowerManagementEnabled -Value 0 -Force -EA SilentlyContinue
+        }
+      `)
+      s('USB Power Guard applied — selective suspend off at power plan + per-device level. Survives sleep/wake.', 'ok')
     },
     restore: async (s, ps, _, cmd) => {
       await cmd('powercfg /setacvalueindex SCHEME_CURRENT 2a737441-1930-4402-8d77-b2bebba308a3 48e6b7a6-50f5-4782-a5d4-53bb8f07e226 1')
       await ps('Remove-ItemProperty -Path "HKLM:\\SYSTEM\\CurrentControlSet\\Services\\usb" -Name DisableSelectiveSuspend -EA SilentlyContinue')
+      await ps(`
+        $hubs = Get-ChildItem 'HKLM:\\SYSTEM\\CurrentControlSet\\Enum\\USB' -EA SilentlyContinue | Get-ChildItem -EA SilentlyContinue
+        foreach ($dev in $hubs) {
+          $pp = Join-Path $dev.PSPath 'Device Parameters'
+          if (Test-Path $pp) {
+            Remove-ItemProperty -Path $pp -Name SelectiveSuspendEnabled -EA SilentlyContinue
+          }
+          Remove-ItemProperty -Path $dev.PSPath -Name EnhancedPowerManagementEnabled -EA SilentlyContinue
+        }
+      `)
       s('USB power management restored.', 'ok')
     }
   },
@@ -4128,11 +4234,15 @@ if ($r.Count -eq 0) { Write-Output "NONE_FOUND" } else { foreach ($x in $r) { Wr
         $path = 'HKLM:\\SYSTEM\\CurrentControlSet\\Services\\mouclass\\Parameters'
         New-Item -Path $path -Force -EA SilentlyContinue | Out-Null
         Set-ItemProperty -Path $path -Name MouseDataQueueSize -Value 20 -Force
+        Set-ItemProperty -Path $path -Name HIDDeviceInputProcessingMode -Value 0 -Force
       `)
-      s('Mouse input queue size increased — buffers more samples for high-polling mice.', 'ok')
+      s('Mouse input queue enlarged + unified HID input thread enabled. Fixes multi-monitor pointer flicking. Reboot required.', 'ok')
     },
     restore: async (s, ps) => {
-      await ps('Remove-ItemProperty -Path "HKLM:\\SYSTEM\\CurrentControlSet\\Services\\mouclass\\Parameters" -Name MouseDataQueueSize -EA SilentlyContinue')
+      await ps(`
+        Remove-ItemProperty -Path 'HKLM:\\SYSTEM\\CurrentControlSet\\Services\\mouclass\\Parameters' -Name MouseDataQueueSize -EA SilentlyContinue
+        Remove-ItemProperty -Path 'HKLM:\\SYSTEM\\CurrentControlSet\\Services\\mouclass\\Parameters' -Name HIDDeviceInputProcessingMode -EA SilentlyContinue
+      `)
       s('Mouse class parameters restored.', 'ok')
     }
   },
@@ -4926,6 +5036,27 @@ ipcMain.handle('install-update', () => {
 
 // What's New content
 const WHATS_NEW = [
+  { version: '1.3.8', date: 'May 2026', items: [
+    'Personalization — custom accent color picker: override the accent color for any theme and save it across sessions',
+    'Scheduler — 3 new scheduled actions: Free RAM, Check Windows Updates, Clear Downloads Folder',
+    'Game Profiles — 8 new games added: Rainbow Six Siege, Overwatch 2, Escape from Tarkov, Squad, DayZ, Cyberpunk 2077, Red Dead Redemption 2, PUBG',
+    'Pre-Flight — Driver Update Checker: scans GPU, network, and audio drivers and flags outdated ones with download links',
+    'Pre-Flight — CPU Benchmark: run a 10-second CPU test and compare scores before/after tweaks',
+    'Tweak History — Undo/Re-apply button on every history entry for reversible tweaks',
+    'Discord RPC — already shows active game detected by the game watcher (was already implemented in v1.3.7)',
+  ]},
+  { version: '1.3.7', date: 'May 2026', items: [
+    'BIOS Tuner — detects BIOS vendor (AMI/Phoenix/Insyde) and shows targeted compatibility message',
+    'BIOS Tuner — Recommendations card analyzes your specs and suggests settings (XMP, Resizable BAR, Secure Boot, TPM, C-States)',
+    'BIOS Tuner — CPU Power Tuner now correctly detects AMD/Ryzen CPUs',
+    'BIOS Tuner — Fan Control section: launch FanControl UI or run in background, stop with one click',
+    'BIOS Tuner — RAM Diagnostics shows memory timings via CPU-Z (CL, tRCD, tRP, tRAS, Command Rate)',
+    'BIOS Tuner — Power Supply Idle Control marked as dangerous (requires safety toggle)',
+    'CPU temperature panel fixed — no longer stuck on "No sensor" when LHM is installed',
+    'Crash fix — bundled tools (LHM, SCEWIN, RyzenAdj, FanControl, CPU-Z) now correctly unpacked from asar on installed builds',
+    'Language toggle removed — app is now English only',
+    'Profiles tab removed from sidebar',
+  ]},
   { version: '1.3.5', date: 'May 2026', items: [
     'Fix Mouse ghosting — now covers 7 root causes including MMCSS=0, HID class filter drivers, CPU core parking via both registry paths (GUID + CPMINCORES), and forces Windows power engine to re-read settings immediately via /setactive with real scheme GUID',
     'Boot-time ghosting fix — the fix now works even when Pulse was never used, catching issues left by other optimizer tools',
@@ -5305,6 +5436,8 @@ ipcMain.handle('open-pulse-window', () => {
     transparent: false,
     backgroundColor: '#0d0d0d',
     show: false,
+    focusable: false,
+    skipTaskbar: true,
     title: 'Pulse',
     icon: path.join(__dirname, 'assets', 'icon.png'),
     webPreferences: {
@@ -5339,6 +5472,8 @@ ipcMain.handle('open-fivem-settings', () => {
     transparent: false,
     backgroundColor: '#0d0d0d',
     show: false,
+    focusable: false,
+    skipTaskbar: true,
     title: 'FiveM Graphics Settings',
     icon: path.join(__dirname, 'assets', 'icon.png'),
     webPreferences: {
@@ -5375,6 +5510,8 @@ ipcMain.handle('open-arma-settings', () => {
     transparent: false,
     backgroundColor: '#0d0d0d',
     show: false,
+    focusable:   false,
+    skipTaskbar: true,
     title: 'Arma Reforger Graphics Settings',
     icon: path.join(__dirname, 'assets', 'icon.png'),
     webPreferences: {
@@ -5519,12 +5656,12 @@ const PULSE_PRESETS = {
   fortnite:     { name: 'Fortnite',            exe: 'FortniteClient-Win64-Shipping', priority: 'High',        killList: ['EpicGamesLauncher','EpicWebHelper','chrome','msedge'] },
   valorant:     { name: 'Valorant',            exe: 'VALORANT-Win64-Shipping',       priority: 'High',        killList: ['chrome','msedge','OneDrive'] },
   csgo:         { name: 'CS2 / CS:GO',         exe: 'cs2',                           priority: 'High',        killList: ['chrome','msedge','steam','steamwebhelper'] },
-  fivem:        { name: 'FiveM',               exe: 'FiveM_GTAProcess',              priority: 'AboveNormal', killList: ['chrome','msedge','OneDrive','Teams'] },
+  fivem:        { name: 'FiveM',               exe: 'FiveM_GTAProcess',              priority: 'AboveNormal', cpuIntensive: true,  killList: ['chrome','msedge','OneDrive','Teams'] },
   warzone:      { name: 'Warzone',             exe: 'cod',                           priority: 'High',        killList: ['chrome','msedge','OneDrive'] },
   apex:         { name: 'Apex Legends',        exe: 'r5apex',                        priority: 'High',        killList: ['chrome','msedge','EpicGamesLauncher'] },
-  minecraft:    { name: 'Minecraft',           exe: 'javaw',                         priority: 'AboveNormal', killList: ['chrome','msedge','OneDrive'] },
-  arma:         { name: 'Arma Reforger',       exe: 'ArmaReforger*',                 priority: 'High',        killList: ['chrome','msedge','OneDrive','Teams'] },
-  tarkov:       { name: 'Escape from Tarkov',  exe: 'EscapeFromTarkov',              priority: 'High',        killList: ['chrome','msedge','OneDrive'] },
+  minecraft:    { name: 'Minecraft',           exe: 'javaw',                         priority: 'AboveNormal', cpuIntensive: true,  killList: ['chrome','msedge','OneDrive'] },
+  arma:         { name: 'Arma Reforger',       exe: 'ArmaReforger*',                 priority: 'High',        cpuIntensive: true,  killList: ['chrome','msedge','OneDrive','Teams'] },
+  tarkov:       { name: 'Escape from Tarkov',  exe: 'EscapeFromTarkov',              priority: 'High',        cpuIntensive: true,  killList: ['chrome','msedge','OneDrive'] },
   rocketleague: { name: 'Rocket League',       exe: 'RocketLeague',                  priority: 'High',        killList: ['chrome','msedge','EpicGamesLauncher'] },
   rust:         { name: 'Rust',                exe: 'RustClient',                    priority: 'High',        killList: ['chrome','msedge','OneDrive'] },
   r6:           { name: 'Rainbow Six Siege',   exe: 'RainbowSix',                    priority: 'High',        killList: ['chrome','msedge','OneDrive','Teams'] },
@@ -5611,25 +5748,6 @@ public class TimerRes { [DllImport("ntdll.dll")] public static extern int NtSetT
     pulseOrigPowerPlan = null
   }
 
-  // Restore DWM I/O + page priority to normal
-  await runPS(`
-    $dwm = Get-Process -Name dwm -EA SilentlyContinue | Select-Object -First 1
-    if ($dwm) {
-      try {
-        Add-Type -TypeDefinition @'
-using System; using System.Runtime.InteropServices;
-public class ProcPrio {
-  [DllImport("ntdll.dll")] public static extern int NtSetInformationProcess(IntPtr h, int cls, ref int val, int len);
-}
-'@ -EA SilentlyContinue
-        $ioPrio = 2   # IO_PRIORITY_HINT: 2 = Low (Windows default for DWM)
-        $pgPrio = 5   # MEMORY_PRIORITY: 5 = Normal
-        [ProcPrio]::NtSetInformationProcess($dwm.Handle, 21, [ref]$ioPrio, 4) | Out-Null
-        [ProcPrio]::NtSetInformationProcess($dwm.Handle, 33, [ref]$pgPrio, 4) | Out-Null
-      } catch {}
-    }
-  `, 8000)
-
   // Restore all process priorities to Normal (skip critical system procs)
   await runPS(`
     Get-Process -EA SilentlyContinue | Where-Object {
@@ -5642,6 +5760,7 @@ public class ProcPrio {
 }
 
 async function activatePulse(presetId, killBg, send) {
+  const delay = ms => new Promise(r => setTimeout(r, ms))
   const preset = PULSE_PRESETS[presetId]
   if (!preset) return { ok: false, error: 'Unknown preset' }
   if (pulseActivePreset) await pulseRestoreAll(() => {})
@@ -5650,6 +5769,21 @@ async function activatePulse(presetId, killBg, send) {
   pulseActivePreset = presetId
   lastUsedPulsePreset = presetId
   pulseStartTimestamp = Date.now()
+
+  // Spec-aware tuning — read from cached system info (populated on app load via get-system-info)
+  const coreCount  = os.cpus().length
+  const isLaptop   = cachedSysInfo?.isLaptop ?? false
+  const ramGB      = cachedSysInfo?.ramGB     ?? 16
+  // MMCSS SystemResponsiveness: fewer cores need more aggressive scheduling
+  const sysResponsiveness = coreCount >= 18 ? 18 : coreCount >= 10 ? 14 : 10
+  // Power plan: Balanced on laptops to prevent thermal throttling
+  const powerPlanGuid = isLaptop
+    ? '381b4222-f694-41f0-9685-ff5bb260df2e'   // Balanced
+    : '8c5e7fda-e8bf-4a96-9a85-a6e23a8c635c'  // High Performance
+  // Process priority: cpuIntensive games run better at AboveNormal on many-core systems
+  const effectivePriority = (preset.cpuIntensive && coreCount >= 12)
+    ? 'AboveNormal'
+    : preset.priority
 
   // ── 1. Timer resolution: request 0.5ms via NtSetTimerResolution ──────────────
   // 5000 = 0.5ms in 100ns units. Falls back silently if ntdll isn't available.
@@ -5667,32 +5801,40 @@ public class TimerRes { [DllImport("ntdll.dll")] public static extern int NtSetT
     if (r.out.trim() === 'TIMER_OK') send('  Timer resolution → 0.5ms', 'ok')
     else send('  Timer resolution: skipped (ntdll unavailable)', 'info')
   })
+  await delay(50)
 
   // ── 2. CPU core unparking ─────────────────────────────────────────────────────
   // Parked cores take ~1ms to wake — causes micro-stutters when game bursts load
-  await runPS(`
-    $parkGuid  = '0cc5b647-c1df-4637-891a-dec35c318583'
-    $perfBoost = 'be337238-0d82-4146-a960-4f3749d470c7'
-    $subPower  = '54533251-82be-4824-96c1-47b60b740d00'
-    $schemes = powercfg /list | Select-String 'Power Scheme GUID' | ForEach-Object { ($_ -split ':\s+')[1].Split(' ')[0] }
-    foreach ($s in $schemes) {
-      powercfg /setacvalueindex  $s $subPower $parkGuid  0   2>$null
-      powercfg /setdcvalueindex  $s $subPower $parkGuid  0   2>$null
-      powercfg /setacvalueindex  $s $subPower $perfBoost 3   2>$null
-    }
-    powercfg /update-settings 2>$null
-    Write-Output "UNPARK_OK"
-  `, 20000).then(r => {
-    if (r.out.includes('UNPARK_OK')) send('  CPU core parking disabled', 'ok')
-  })
+  // Skipped on laptops: causes heat spikes and accelerated battery drain
+  if (!isLaptop) {
+    await runPS(`
+      $parkGuid  = '0cc5b647-c1df-4637-891a-dec35c318583'
+      $perfBoost = 'be337238-0d82-4146-a960-4f3749d470c7'
+      $subPower  = '54533251-82be-4824-96c1-47b60b740d00'
+      $schemes = powercfg /list | Select-String 'Power Scheme GUID' | ForEach-Object { ($_ -split ':\s+')[1].Split(' ')[0] }
+      foreach ($s in $schemes) {
+        powercfg /setacvalueindex  $s $subPower $parkGuid  0   2>$null
+        powercfg /setdcvalueindex  $s $subPower $parkGuid  0   2>$null
+        powercfg /setacvalueindex  $s $subPower $perfBoost 3   2>$null
+      }
+      powercfg /update-settings 2>$null
+      Write-Output "UNPARK_OK"
+    `, 20000).then(r => {
+      if (r.out.includes('UNPARK_OK')) send('  CPU core parking disabled', 'ok')
+    })
+  } else {
+    send('  Core unparking skipped (laptop — battery/heat safety)', 'info')
+  }
+  await delay(50)
 
-  // ── 3. Switch to High Performance power plan ─────────────────────────────────
+  // ── 3. Switch power plan (High Performance on desktop, Balanced on laptop) ────
   const planR = await runPS(`(powercfg /getactivescheme) -replace '.*GUID:\\s+(\\S+).*','$1'`)
   pulseOrigPowerPlan = planR.out.trim()
-  await runPS(`powercfg /setactive 8c5e7fda-e8bf-4a96-9a85-a6e23a8c635c`).then(r => {
-    if (r.ok) send('  Power plan → High Performance', 'ok')
+  await runPS(`powercfg /setactive ${powerPlanGuid}`).then(r => {
+    if (r.ok) send(`  Power plan → ${isLaptop ? 'Balanced (laptop)' : 'High Performance'}`, 'ok')
     else send('  Power plan: already optimal or plan unavailable', 'info')
   })
+  await delay(50)
 
   // ── 4. MMCSS boost ────────────────────────────────────────────────────────────
   // Save current value so we can restore it exactly
@@ -5700,20 +5842,19 @@ public class TimerRes { [DllImport("ntdll.dll")] public static extern int NtSetT
   pulseOrigMmcssResponsiveness = parseInt(mmcssR.out.trim()) || 20
   await runPS(`
     $base = 'HKLM:\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\Multimedia\\SystemProfile'
-    Set-ItemProperty -Path $base -Name SystemResponsiveness -Value 10 -Force
+    Set-ItemProperty -Path $base -Name SystemResponsiveness -Value ${sysResponsiveness} -Force
     $gbase = "$base\\Tasks\\Games"
     Set-ItemProperty -Path $gbase -Name 'GPU Priority'        -Value 8      -Force -EA SilentlyContinue
     Set-ItemProperty -Path $gbase -Name 'Priority'            -Value 6      -Force -EA SilentlyContinue
     Set-ItemProperty -Path $gbase -Name 'Scheduling Category' -Value 'High' -Force -EA SilentlyContinue
   `)
-  send('  MMCSS Games scheduling → High (SystemResponsiveness=10)', 'ok')
+  send(`  MMCSS Games scheduling → High (SystemResponsiveness=${sysResponsiveness}, ${coreCount} cores)`, 'ok')
+  await delay(50)
 
   // ── 5. Interrupt affinity — move GPU + top NIC DPCs off CPU 0 ────────────────
-  // Only run on ≥ 6 core systems — on low core counts, routing to a specific CPU
-  // can starve USB HID (mouse/keyboard) interrupt scheduling.
-  // Uses CPU 3 (not 2) to stay further from CPU 0 (OS scheduler) and CPU 1 (game thread).
-  const coreCount = os.cpus().length
-  if (coreCount >= 6) {
+  // Only run on ≥ 6 core desktop systems — skipped on laptops (heat/battery risk)
+  // and low-core systems (HID starvation risk).
+  if (!isLaptop && coreCount >= 6) {
     await runPS(`
       $targetCpu = 3  # CPU 3 — away from OS scheduler (0), game thread (1), and HID (2)
       $mask = [uint32](1 -shl $targetCpu)
@@ -5742,59 +5883,45 @@ public class TimerRes { [DllImport("ntdll.dll")] public static extern int NtSetT
       const m = r.out.match(/AFFINITY_OK:(\d+)/)
       if (m) send(`  Interrupt affinity routed for ${m[1]} device(s) → CPU 3`, 'ok')
     })
+  } else if (isLaptop) {
+    send('  Interrupt affinity skipped (laptop)', 'info')
   } else {
     send(`  Interrupt affinity skipped (${coreCount} cores — HID safety)`, 'info')
   }
+  await delay(50)
 
   // ── 6. Kill background processes ─────────────────────────────────────────────
+  // Skipped on high-RAM systems (≥24GB): killing browsers evicts warm asset cache
+  // and causes stutters as the game reloads assets — costs more than it saves
   if (killBg) {
-    let killed = 0
-    for (const name of preset.killList) {
-      const r = await runPS(`$p = Get-Process -Name '${name}' -EA SilentlyContinue; if ($p) { Stop-Process -Name '${name}' -Force -EA SilentlyContinue; Write-Output 'killed' }`)
-      if (r.out.trim() === 'killed') { send(`  Stopped: ${name}`, 'ok'); killed++ }
+    if (ramGB >= 24) {
+      send(`  Background kill skipped (${ramGB}GB RAM — cache eviction would hurt performance)`, 'info')
+    } else {
+      let killed = 0
+      for (const name of preset.killList) {
+        const r = await runPS(`$p = Get-Process -Name '${name}' -EA SilentlyContinue; if ($p) { Stop-Process -Name '${name}' -Force -EA SilentlyContinue; Write-Output 'killed' }`)
+        if (r.out.trim() === 'killed') { send(`  Stopped: ${name}`, 'ok'); killed++ }
+      }
+      if (killed === 0) send('  No background processes found to stop', 'info')
     }
-    if (killed === 0) send('  No background processes found to stop', 'info')
   }
+  await delay(50)
 
   // ── 7. Game process priority ──────────────────────────────────────────────────
   const exePattern = preset.exe.replace('_GTAProcess', '*GTAProcess')
   const prioR = await runPS(`
     $p = Get-Process -EA SilentlyContinue | Where-Object { $_.Name -like '${exePattern}' } | Select-Object -First 1
     if ($p) {
-      try { $p.PriorityClass = '${preset.priority}' } catch {}
+      try { $p.PriorityClass = '${effectivePriority}' } catch {}
       Write-Output "PRIO_SET:$($p.Id)"
     } else { Write-Output "PRIO_NOTFOUND" }
   `)
-  if (prioR.out.startsWith('PRIO_SET')) send(`  Game priority → ${preset.priority} (${preset.name})`, 'ok')
+  const prioNote = effectivePriority !== preset.priority ? `, adjusted for ${coreCount} cores` : ''
+  if (prioR.out.startsWith('PRIO_SET')) send(`  Game priority → ${effectivePriority} (${preset.name}${prioNote})`, 'ok')
   else send(`  Game process not found yet — priority will apply when game launches`, 'info')
+  await delay(50)
 
-  // ── 8. DWM deprioritisation ───────────────────────────────────────────────────
-  // Lower DWM's I/O and memory page priority (NOT CPU priority — that would break the desktop).
-  // This reduces memory bandwidth DWM steals from the GPU during fullscreen/borderless games.
-  await runPS(`
-    $dwm = Get-Process -Name dwm -EA SilentlyContinue | Select-Object -First 1
-    if ($dwm) {
-      Add-Type -TypeDefinition @'
-using System; using System.Runtime.InteropServices;
-public class ProcPrio {
-  [DllImport("ntdll.dll")] public static extern int NtSetInformationProcess(IntPtr h, int cls, ref int val, int len);
-}
-'@ -EA SilentlyContinue
-      try {
-        $handle = $dwm.Handle
-        $ioPrio = 2   # IO_PRIORITY_HINT: 2 = Low (safe minimum — VeryLow starves desktop rendering)
-        $pgPrio = 3   # MEMORY_PRIORITY: 3 = Below Normal (reduced without breaking DWM)
-        [ProcPrio]::NtSetInformationProcess($handle, 21, [ref]$ioPrio, 4) | Out-Null  # ProcessIoPriority
-        [ProcPrio]::NtSetInformationProcess($handle, 33, [ref]$pgPrio, 4) | Out-Null  # ProcessPagePriority
-        Write-Output "DWM_OK"
-      } catch { Write-Output "DWM_SKIP" }
-    } else { Write-Output "DWM_SKIP" }
-  `, 10000).then(r => {
-    if (r.out.trim() === 'DWM_OK') send('  DWM I/O + page priority lowered (frees memory bandwidth for GPU)', 'ok')
-    else send('  DWM deprioritisation: skipped', 'info')
-  })
-
-  // ── 9. Background process deprioritisation ────────────────────────────────────
+  // ── 8. Background process deprioritisation ────────────────────────────────────
   await runPS(`
     $gamePid = (Get-Process -EA SilentlyContinue | Where-Object { $_.Name -like '${exePattern}' } | Select-Object -First 1)?.Id
     Get-Process -EA SilentlyContinue | Where-Object {
@@ -6131,8 +6258,8 @@ ipcMain.handle('start-game-watcher', async () => {
   mainWindow?.webContents.send('log', { msg: '◆ Game Watcher started — monitoring for game launches…', level: 'ok', ts: new Date().toLocaleTimeString() })
 
   gameWatcherInterval = setInterval(async () => {
-    const r = await runPS("Get-Process | Select-Object -ExpandProperty Name", 5000)
-    const running = new Set(r.out.split('\n').map(l => l.trim().toLowerCase()))
+    const r = await runCmd('tasklist /fo csv /nh')
+    const running = new Set(r.out.split('\n').map(l => l.split(',')[0]?.replace(/"/g, '').replace(/\.exe$/i, '').trim().toLowerCase()))
 
     // Detect by matching directly against PULSE_PRESETS exe names
     let detectedGame = null
@@ -6282,10 +6409,13 @@ ipcMain.handle('schedule-tweak', async (_, { taskName, schedule, action }) => {
   const send = (msg, level) => mainWindow?.webContents.send('log', { msg, level, ts: new Date().toLocaleTimeString() })
 
   const psCommands = {
-    'clean-temp':    'Remove-Item -Path $env:TEMP\\* -Recurse -Force -EA SilentlyContinue; Remove-Item -Path C:\\Windows\\Temp\\* -Recurse -Force -EA SilentlyContinue; Remove-Item -Path C:\\Windows\\Prefetch\\* -Force -EA SilentlyContinue',
-    'flush-dns':     'ipconfig /flushdns',
-    'clean-nvidia':  'Remove-Item -Path "$env:LOCALAPPDATA\\NVIDIA\\DXCache\\*" -Recurse -Force -EA SilentlyContinue; Remove-Item -Path "$env:LOCALAPPDATA\\NVIDIA\\GLCache\\*" -Recurse -Force -EA SilentlyContinue; Remove-Item -Path "$env:LOCALAPPDATA\\Temp\\NVIDIA Corporation\\NV_Cache\\*" -Recurse -Force -EA SilentlyContinue',
-    'defrag-c':      'Optimize-Volume -DriveLetter C -Defrag -Verbose',
+    'clean-temp':        'Remove-Item -Path $env:TEMP\\* -Recurse -Force -EA SilentlyContinue; Remove-Item -Path C:\\Windows\\Temp\\* -Recurse -Force -EA SilentlyContinue; Remove-Item -Path C:\\Windows\\Prefetch\\* -Force -EA SilentlyContinue',
+    'flush-dns':         'ipconfig /flushdns',
+    'clean-nvidia':      'Remove-Item -Path "$env:LOCALAPPDATA\\NVIDIA\\DXCache\\*" -Recurse -Force -EA SilentlyContinue; Remove-Item -Path "$env:LOCALAPPDATA\\NVIDIA\\GLCache\\*" -Recurse -Force -EA SilentlyContinue; Remove-Item -Path "$env:LOCALAPPDATA\\Temp\\NVIDIA Corporation\\NV_Cache\\*" -Recurse -Force -EA SilentlyContinue',
+    'defrag-c':          'Optimize-Volume -DriveLetter C -Defrag -Verbose',
+    'clean-ram':         '[System.GC]::Collect(); Clear-RecycleBin -Force -EA SilentlyContinue',
+    'windows-update':    'Start-Process "ms-settings:windowsupdate-action"',
+    'clean-downloads':   'Remove-Item -Path "$env:USERPROFILE\\Downloads\\*" -Recurse -Force -EA SilentlyContinue',
   }
   const psCommand = psCommands[action] || action
 
@@ -6454,5 +6584,295 @@ ipcMain.handle('get-health-score', async (_, settings) => {
     },
     tempMB, startupCount, diskHealth,
     appliedTweaks, driverDate
+  }
+})
+
+// ─── BIOS Tuner IPC handlers ──────────────────────────────────────────────────
+
+ipcMain.handle('get-bios-info', async () => {
+  const r = await runPS(`
+    $b   = Get-WmiObject Win32_BIOS -EA SilentlyContinue
+    $cs  = Get-WmiObject Win32_ComputerSystem -EA SilentlyContinue
+    $cpu = Get-WmiObject Win32_Processor -EA SilentlyContinue | Select-Object -First 1
+    $ram = Get-WmiObject Win32_PhysicalMemory -EA SilentlyContinue
+    $tpm = Get-Tpm -EA SilentlyContinue
+    $sb  = try { Confirm-SecureBootUEFI -EA SilentlyContinue } catch { $null }
+    $hvLine = (bcdedit /enum | Select-String 'hypervisorlaunchtype')
+    $hv = if ($hvLine) { $hvLine.ToString().Trim() } else { '' }
+    $ramRated  = ($ram | Measure-Object -Property Speed -Maximum).Maximum
+    $ramActual = ($ram | Measure-Object -Property ConfiguredClockSpeed -Maximum).Maximum
+    $ramGen    = ($ram | Select-Object -First 1).SMBIOSMemoryType
+    $biosDate  = if ($b.ReleaseDate) { ([Management.ManagementDateTimeConverter]::ToDateTime($b.ReleaseDate)).ToString('yyyy-MM-dd') } else { '' }
+    $uefi = try {
+      (Get-ItemProperty 'HKLM:\\SYSTEM\\CurrentControlSet\\Control' -EA SilentlyContinue).PEFirmwareType -eq 2
+    } catch { $false }
+    $chipset = try {
+      (Get-WmiObject Win32_IDEController -EA SilentlyContinue | Where-Object { $_.Name -match 'Intel|AMD|NVIDIA' } | Select-Object -First 1).Name
+    } catch { '' }
+    Write-Output "BIOS_VER=$($b.SMBIOSBIOSVersion)"
+    Write-Output "BIOS_DATE=$biosDate"
+    Write-Output "BIOS_MFR=$($b.Manufacturer)"
+    Write-Output "BOARD=$($cs.Model)"
+    Write-Output "UEFI=$uefi"
+    Write-Output "SECURE_BOOT=$sb"
+    Write-Output "TPM_PRESENT=$($tpm.TpmPresent)"
+    Write-Output "TPM_VER=$($tpm.ManufacturerVersion)"
+    Write-Output "VIRT=$($cpu.VirtualizationFirmwareEnabled)"
+    Write-Output "RAM_RATED=$ramRated"
+    Write-Output "RAM_ACTUAL=$ramActual"
+    Write-Output "RAM_GEN=$ramGen"
+    Write-Output "CHIPSET=$chipset"
+    Write-Output "HYPERV=$hv"
+  `, 20000)
+  const get = (key) => r.out.match(new RegExp(key + '=(.*)'))?.[1]?.trim() ?? ''
+  const ramRated  = parseInt(get('RAM_RATED'))  || 0
+  let   ramActual = parseInt(get('RAM_ACTUAL')) || 0
+  const ramGen    = parseInt(get('RAM_GEN'))    || 0
+  // SMBIOSMemoryType 34 = DDR5. WMI reports DDR5 ConfiguredClockSpeed at half effective rate on many boards.
+  // If SMBIOSMemoryType is DDR5 (34) and actual*2 is within 10% of rated, double it.
+  let ramNote = ''
+  if (ramGen === 34 && ramActual > 0 && ramRated > 0 && Math.abs(ramActual * 2 - ramRated) / ramRated < 0.15) {
+    ramActual *= 2
+    ramNote = 'DDR5'
+  }
+  const biosMfr = get('BIOS_MFR')
+  const biosType = /american megatrends/i.test(biosMfr) ? 'ami'
+                 : /phoenix/i.test(biosMfr)             ? 'phoenix'
+                 : /insyde/i.test(biosMfr)              ? 'insyde'
+                 : /award/i.test(biosMfr)               ? 'award'
+                 : 'unknown'
+  return {
+    ok: r.ok,
+    biosVersion:  get('BIOS_VER'),
+    biosDate:     get('BIOS_DATE'),
+    biosMfr,
+    biosType,
+    board:        get('BOARD'),
+    uefi:         get('UEFI') === 'True',
+    secureBoot:   get('SECURE_BOOT') === 'True',
+    tpmPresent:   get('TPM_PRESENT') === 'True',
+    tpmVersion:   get('TPM_VER'),
+    virt:         get('VIRT') === 'True',
+    ramRated, ramActual, ramNote,
+    chipset:      get('CHIPSET'),
+    hyperV:       get('HYPERV').toLowerCase().includes('auto'),
+  }
+})
+
+ipcMain.handle('bios-scewin-read', async () => {
+  const scewin   = assetPath('assets', 'scewin', 'SCEWIN_64.exe')
+  const dumpPath = path.join(app.getPath('userData'), 'bios_dump.txt')
+  if (!fs.existsSync(scewin)) return { ok: false, error: 'not_found', dumpPath }
+  const r = await runCmd(`"${scewin}" /o /s "${dumpPath}"`)
+  if (!r.ok && !fs.existsSync(dumpPath)) return { ok: false, error: 'not_supported', dumpPath }
+  let raw = ''
+  try { raw = fs.readFileSync(dumpPath, 'utf8') } catch { return { ok: false, error: 'read_failed', dumpPath } }
+  const entries = []
+  for (const block of raw.split(/\r?\n\r?\n/)) {
+    const name    = block.match(/Setup Question\s+=\s+(.+)/)?.[1]?.trim()
+    const token   = block.match(/Token\s+=\s+(\S+)/)?.[1]
+    const options = [...block.matchAll(/[ \t]+(\*?)(0x[0-9a-fA-F]+)\s+(.+)/g)].map(m => ({
+      value: m[2], label: m[3].trim(), current: m[1] === '*'
+    }))
+    if (name && token && options.length) {
+      entries.push({ name, token, options, current: options.find(o => o.current)?.value ?? options[0]?.value })
+    }
+  }
+  return { ok: true, entries, dumpPath }
+})
+
+ipcMain.handle('bios-scewin-write', async (_, { token, value, dumpPath }) => {
+  const scewin     = assetPath('assets', 'scewin', 'SCEWIN_64.exe')
+  const backupPath = dumpPath.replace('bios_dump.txt', 'bios_dump_backup.txt')
+  if (!fs.existsSync(scewin))   return { ok: false, error: 'SCEWIN not found' }
+  if (!fs.existsSync(dumpPath)) return { ok: false, error: 'No BIOS dump — run scan first' }
+  // Backup dump before every write so we can auto-restore on failure
+  fs.copyFileSync(dumpPath, backupPath)
+  let raw = fs.readFileSync(dumpPath, 'utf8')
+  const tokenEsc = token.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+  const valueEsc = value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+  raw = raw.replace(
+    new RegExp(`(Setup Question[^\\n]*\\n(?:(?!Setup Question)[^\\n]*\\n)*Token\\s+=\\s+${tokenEsc}[\\s\\S]*?)(?=\\r?\\n\\r?\\n|$)`, 'g'),
+    (block) => {
+      let b = block.replace(/^(\s+)\*/gm, '$1 ')
+      b = b.replace(new RegExp(`([ \\t]+) (${valueEsc}[ \\t])`), '$1*$2')
+      return b
+    }
+  )
+  fs.writeFileSync(dumpPath, raw, 'utf8')
+  const r = await runCmd(`"${scewin}" /i /s "${dumpPath}"`)
+  if (!r.ok) {
+    // Auto-restore backup so the dump stays consistent
+    try { fs.copyFileSync(backupPath, dumpPath) } catch {}
+    return { ok: false, restored: true, error: 'SCEWIN write failed — your board may not support runtime BIOS writes. Previous dump restored.' }
+  }
+  return { ok: true }
+})
+
+ipcMain.handle('bios-hyper-v', async (_, { action }) => {
+  const cmd = action === 'apply' ? 'bcdedit /set hypervisorlaunchtype off' : 'bcdedit /set hypervisorlaunchtype auto'
+  const r = await runCmd(cmd)
+  return { ok: r.ok, error: r.err || null }
+})
+
+ipcMain.handle('bios-cstates', async (_, { action }) => {
+  if (action === 'apply') {
+    await runCmd('powercfg /setacvalueindex SCHEME_CURRENT SUB_PROCESSOR IDLEDISABLE 1')
+    await runCmd('powercfg /setdcvalueindex SCHEME_CURRENT SUB_PROCESSOR IDLEDISABLE 1')
+  } else {
+    await runCmd('powercfg /setacvalueindex SCHEME_CURRENT SUB_PROCESSOR IDLEDISABLE 0')
+    await runCmd('powercfg /setdcvalueindex SCHEME_CURRENT SUB_PROCESSOR IDLEDISABLE 0')
+  }
+  await runCmd('powercfg /setactive SCHEME_CURRENT')
+  return { ok: true }
+})
+
+ipcMain.handle('get-ram-info', async () => {
+  const r = await runPS(`
+    $sticks = Get-WmiObject Win32_PhysicalMemory -EA SilentlyContinue
+    foreach ($s in $sticks) {
+      $cap = [math]::Round($s.Capacity / 1GB, 0)
+      Write-Output "SLOT=$($s.DeviceLocator)|$cap|$($s.Speed)|$($s.ConfiguredClockSpeed)|$($s.Manufacturer)|$($s.PartNumber)|$($s.ConfiguredVoltage)|$($s.MinVoltage)|$($s.MaxVoltage)|$($s.SMBIOSMemoryType)"
+    }
+  `, 10000)
+  const sticks = r.out.split('\n').filter(l => l.startsWith('SLOT=')).map(l => {
+    const [slot, cap, rated, actual, mfr, part, volt, minV, maxV, memType] = l.replace('SLOT=', '').split('|')
+    return {
+      slot: slot?.trim() || '', cap: parseInt(cap) || 0, rated: parseInt(rated) || 0,
+      actual: parseInt(actual) || 0, mfr: mfr?.trim() || '', part: part?.trim() || '',
+      volt: parseInt(volt) || 0, minV: parseInt(minV) || 0, maxV: parseInt(maxV) || 0,
+      ddr5: parseInt(memType) === 34
+    }
+  })
+  return { ok: r.ok, sticks }
+})
+
+ipcMain.handle('ryzenadj-read', async () => {
+  const ryzenadj = assetPath('assets', 'ryzenadj', 'ryzenadj.exe')
+  if (!fs.existsSync(ryzenadj)) return { ok: false, error: 'not_found' }
+  const r = await runCmd(`"${ryzenadj}" --info`)
+  const parse = (key) => parseFloat(r.out.match(new RegExp(key + '\\s*\\[\\S+\\]\\s+([\\d.]+)'))?.[1] || '0')
+  return {
+    ok: r.ok || r.out.length > 0,
+    ppt: parse('PPT LIMIT FAST'),
+    tdc: parse('TDC LIMIT SLOW'),
+    edc: parse('EDC LIMIT SLOW'),
+  }
+})
+
+ipcMain.handle('ryzenadj-apply', async (_, { ppt, tdc, edc }) => {
+  const ryzenadj = assetPath('assets', 'ryzenadj', 'ryzenadj.exe')
+  if (!fs.existsSync(ryzenadj)) return { ok: false, error: 'not_found' }
+  const args = []
+  if (ppt > 0) args.push(`--ppt-limit-fast=${ppt * 1000}`)
+  if (tdc > 0) args.push(`--tdc-limit-slow=${tdc * 1000}`)
+  if (edc > 0) args.push(`--edc-limit-slow=${edc * 1000}`)
+  if (!args.length) return { ok: false, error: 'No values provided' }
+  const r = await runCmd(`"${ryzenadj}" ${args.join(' ')}`)
+  return { ok: r.ok, error: r.ok ? null : (r.err || r.out || 'RyzenAdj failed') }
+})
+
+ipcMain.handle('fancontrol-start', async (_, minimized) => {
+  const exe = assetPath('assets', 'fancontrol', 'FanControl.exe')
+  if (!fs.existsSync(exe)) return { ok: false, error: 'not_found' }
+  try {
+    const args = minimized ? ['-m'] : []
+    const proc = spawn(exe, args, { cwd: assetPath('assets', 'fancontrol'), detached: true, windowsHide: false, stdio: 'ignore' })
+    proc.unref()
+    return { ok: true }
+  } catch (e) { return { ok: false, error: e.message } }
+})
+
+ipcMain.handle('fancontrol-stop', async () => {
+  try { require('child_process').execSync('taskkill /f /im FanControl.exe', { stdio: 'ignore' }); return { ok: true } }
+  catch { return { ok: false } }
+})
+
+ipcMain.handle('fancontrol-status', async () => {
+  try {
+    const out = require('child_process').execSync('tasklist /fi "imagename eq FanControl.exe" /fo csv /nh', { encoding: 'utf8' })
+    return { running: out.includes('FanControl.exe') }
+  } catch { return { running: false } }
+})
+
+ipcMain.handle('cpuz-read-timings', async () => {
+  const exe = assetPath('assets', 'cpuz', 'cpuz_x64.exe')
+  if (!fs.existsSync(exe)) return { ok: false, error: 'not_found' }
+  const outPath = path.join(app.getPath('temp'), 'cpuz_out.txt')
+  try {
+    require('child_process').execSync(`"${exe}" -txt="${outPath}"`, { timeout: 10000 })
+    await new Promise(r => setTimeout(r, 2000))
+    const txt = fs.readFileSync(outPath, 'utf16le')
+    const getField = (label) => txt.match(new RegExp(label + '\\s*[:\\-]\\s*(.+)'))?.[1]?.trim() ?? ''
+    return { ok: true, cl: getField('CAS# Latency'), trcd: getField('RAS# to CAS#'), trp: getField('RAS# Precharge'), tras: getField('Cycle Time'), cr: getField('Command Rate'), freq: getField('DRAM Frequency') }
+  } catch (e) { return { ok: false, error: e.message } }
+})
+
+ipcMain.handle('get-driver-info', async () => {
+  try {
+    const ps = `
+$drivers = Get-CimInstance Win32_PnPSignedDriver |
+  Where-Object { $_.DeviceClass -in @('DISPLAY','NET','MEDIA','SYSTEM') -and $_.Manufacturer -and $_.Manufacturer -ne 'Microsoft' -and $_.Manufacturer -ne '(Standard system devices)' -and $_.DeviceName } |
+  Select-Object DeviceName, Manufacturer, DriverVersion, DriverDate, DeviceClass |
+  Sort-Object DeviceClass
+$drivers | ConvertTo-Json -Depth 2 -Compress`
+    const out = require('child_process').execSync(
+      `powershell -NoProfile -NonInteractive -Command "${ps.replace(/\n/g,' ').replace(/"/g,'\\"')}"`,
+      { encoding: 'utf8', timeout: 20000 }
+    )
+    let drivers = []
+    try { drivers = JSON.parse(out.trim() || '[]') } catch {}
+    if (!Array.isArray(drivers)) drivers = [drivers]
+    return { ok: true, drivers }
+  } catch (e) { return { ok: false, error: e.message } }
+})
+
+ipcMain.handle('run-benchmark', async () => {
+  const ps = `
+$count = 0
+$limit = [DateTime]::Now.AddSeconds(10)
+while ([DateTime]::Now -lt $limit) {
+  for ($n = 2; $n -lt 3000; $n++) {
+    $isPrime = $true
+    for ($i = 2; $i -le [Math]::Sqrt($n); $i++) { if ($n % $i -eq 0) { $isPrime = $false; break } }
+    if ($isPrime) { $count++ }
+  }
+}
+Write-Output "SCORE=$count"`
+  try {
+    const out = require('child_process').execSync(
+      `powershell -NoProfile -NonInteractive -Command "${ps.replace(/\n/g,' ')}"`,
+      { encoding: 'utf8', timeout: 25000 }
+    )
+    const score = parseInt(out.match(/SCORE=(\d+)/)?.[1] || '0')
+    return { ok: true, score }
+  } catch (e) { return { ok: false, error: e.message } }
+})
+
+ipcMain.handle('get-temps', async () => {
+  const r = await runPS(`
+$ns = 'root\\LibreHardwareMonitor'
+$sensors = try { Get-WmiObject -Namespace $ns -Class Sensor -EA Stop } catch { $null }
+if (-not $sensors) { Write-Output "LHM_UNAVAILABLE=1"; exit }
+$cpuTemp  = ($sensors | Where-Object { $_.SensorType -eq 'Temperature' -and $_.Name -match 'CPU Package|Core Average|CPU' } | Sort-Object Value -Desc | Select-Object -First 1).Value
+$gpuTemp  = ($sensors | Where-Object { $_.SensorType -eq 'Temperature' -and ($_.Identifier -match '/gpu' -or $_.Name -match 'GPU Core|GPU') } | Sort-Object Value -Desc | Select-Object -First 1).Value
+$cpuLoad  = ($sensors | Where-Object { $_.SensorType -eq 'Load' -and $_.Name -match 'CPU Total' } | Select-Object -First 1).Value
+$gpuLoad  = ($sensors | Where-Object { $_.SensorType -eq 'Load' -and ($_.Identifier -match '/gpu' -or $_.Name -match 'GPU Core') } | Select-Object -First 1).Value
+$gpuVram  = ($sensors | Where-Object { $_.SensorType -eq 'SmallData' -and $_.Name -match 'GPU Memory Used' } | Select-Object -First 1).Value
+Write-Output "CPU_TEMP=$cpuTemp"
+Write-Output "GPU_TEMP=$gpuTemp"
+Write-Output "CPU_LOAD=$cpuLoad"
+Write-Output "GPU_LOAD=$gpuLoad"
+Write-Output "GPU_VRAM_USED=$gpuVram"
+  `, 8000)
+  if (r.out.includes('LHM_UNAVAILABLE')) return { ok: false, reason: 'lhm_not_running' }
+  const get = (k) => parseFloat(r.out.match(new RegExp(k + '=([\\d.]+)'))?.[1] || '0')
+  return {
+    ok: true,
+    cpuTemp:     get('CPU_TEMP'),
+    gpuTemp:     get('GPU_TEMP'),
+    cpuLoad:     get('CPU_LOAD'),
+    gpuLoad:     get('GPU_LOAD'),
+    gpuVramUsed: get('GPU_VRAM_USED'),
   }
 })

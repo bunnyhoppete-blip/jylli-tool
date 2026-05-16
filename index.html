@@ -131,6 +131,7 @@ html, body { height: 100%; overflow: hidden; background: var(--bg); color: var(-
 @keyframes navActivate { from { opacity: 0.5; transform: scale(0.97); } to { opacity: 1; transform: scale(1); } }
 @keyframes navBarSlide { from { transform: scaleY(0); } to { transform: scaleY(1); } }
 @keyframes livePulse { 0%,100% { box-shadow: 0 0 0 0 var(--pink-glow); } 50% { box-shadow: 0 0 0 6px transparent; } }
+@keyframes xmp-pulse { 0%,100% { box-shadow: 0 0 0 0 rgba(184,120,0,0.4); } 50% { box-shadow: 0 0 0 5px rgba(184,120,0,0); } }
 
 /* ─── Sidebar collapsed mode ────────────────────────────────────────────── */
 #sidebar { transition: width 0.2s cubic-bezier(0.22,1,0.36,1); }
@@ -1599,8 +1600,7 @@ select.styled-select:focus { border-color: var(--pink); }
     </div>
     <div class="spacer"></div>
     <div style="-webkit-app-region:no-drag;display:flex;align-items:center;gap:6px;padding-right:6px">
-      <button id="lang-btn" class="header-btn" onclick="cycleLanguage()" title="Switch language / Vaihda kieli" style="min-width:36px">EN</button>
-      <button id="adv-toggle-btn" class="header-btn" onclick="toggleAdvancedMode()" title="Show/hide advanced tabs"><i class="fa fa-gear"></i> Advanced</button>
+<button id="adv-toggle-btn" class="header-btn" onclick="toggleAdvancedMode()" title="Show/hide advanced tabs"><i class="fa fa-gear"></i> Advanced</button>
       <button onclick="showBugReport()" style="padding:3px 11px;border-radius:5px;font-size:10px;font-weight:600;cursor:pointer;background:rgba(231,76,60,0.1);color:#e74c3c;border:1px solid rgba(231,76,60,0.3);font-family:inherit;transition:all 0.14s ease" onmouseover="this.style.background='#e74c3c';this.style.color='#fff'" onmouseout="this.style.background='rgba(231,76,60,0.1)';this.style.color='#e74c3c'"><i class="fa fa-bug"></i> Report Bug</button>
       <button onclick="showWhatsNew()" style="padding:3px 11px;border-radius:5px;font-size:10px;font-weight:600;cursor:pointer;background:rgba(243,156,18,0.1);color:#F39C12;border:1px solid rgba(243,156,18,0.3);font-family:inherit;transition:all 0.14s ease" onmouseover="this.style.background='#F39C12';this.style.color='#000'" onmouseout="this.style.background='rgba(243,156,18,0.1)';this.style.color='#F39C12'"><i class="fa fa-star"></i> What's New</button>
       <div id="admin-badge" class="admin"><i class="fa fa-lock"></i> ADMIN</div>
@@ -1666,6 +1666,9 @@ select.styled-select:focus { border-color: var(--pink); }
       <button class="nav-btn" data-page="cleanup" data-label="Cleanup" onclick="showPage('cleanup')">
         <span class="nav-icon"><i class="fa fa-broom"></i></span><span class="nav-label">Cleanup</span>
       </button>
+      <button class="nav-btn" data-page="bios-tuner" data-label="BIOS Tuner" onclick="showPage('bios-tuner')">
+        <span class="nav-icon"><i class="fa fa-microchip"></i></span><span class="nav-label">BIOS Tuner</span>
+      </button>
       <button class="nav-btn" data-page="ping-test" data-label="Ping Test" data-advanced="true" onclick="showPage('ping-test')">
         <span class="nav-icon"><i class="fa fa-satellite-dish"></i></span><span class="nav-label">Ping Test</span>
       </button>
@@ -1674,9 +1677,6 @@ select.styled-select:focus { border-color: var(--pink); }
       </button>
       <button class="nav-btn" data-page="changelog" data-label="Tweak History" onclick="showPage('changelog')">
         <span class="nav-icon"><i class="fa fa-clipboard-list"></i></span><span class="nav-label">Tweak History</span>
-      </button>
-      <button class="nav-btn" data-page="tweak-profiles" data-label="Profiles" onclick="showPage('tweak-profiles')">
-        <span class="nav-icon"><i class="fa fa-layer-group"></i></span><span class="nav-label">Profiles</span>
       </button>
       <div class="sidebar-divider"></div>
       <button class="nav-btn" data-page="personalization" data-label="Personalization" onclick="showPage('personalization')">
@@ -1734,8 +1734,9 @@ const LANG = {
       'fivem':'FiveM & GTA V tweaks','cleanup':'Clean temp files and caches',
       'ping-test':'Test network latency','scheduler':'Task scheduler management',
       'changelog':'Applied tweak history','personalization':'Theme and display settings',
-      'latency-monitor':'Real-time latency tracking','tweak-profiles':'Save and load tweak sets',
+      'latency-monitor':'Real-time latency tracking',
       'pulse':'Game performance mode — timer resolution, core unparking, interrupt routing',
+      'bios-tuner':'Read and write BIOS/UEFI settings directly from Windows',
     },
     sections: {},
     ui: {
@@ -1887,7 +1888,7 @@ const LANG = {
       'app-optimizer':'App Optimizer','fivem':'FiveM','cleanup':'Cleanup',
       'ping-test':'Ping Test','scheduler':'Scheduler','changelog':'Tweak History',
       'personalization':'Personalization','latency-monitor':'Latency Monitor',
-      'tweak-profiles':'Tweak Profiles','pulse':'Pulse',
+      'pulse':'Pulse','bios-tuner':'BIOS Tuner',
     },
     aomQuestions: [
       { label:'Do you use Microsoft Edge?',                       sub:'No = Edge background services will be disabled' },
@@ -1901,7 +1902,6 @@ const LANG = {
       { label:'Do you use Sticky Keys / Accessibility hotkeys?',  sub:'No = Accidental StickyKeys trigger disabled' },
       { label:'Do you have a third-party antivirus?',             sub:'Yes = Defender notifications will be silenced' },
     ],
-    aomLang: { title:'Choose Language', sub:'You can change this anytime from the titlebar.', en:'English', fi:'Finnish (Suomi)' },
     tweakDescs: {},
     fixDescs: {},
     rpCards: [
@@ -1910,415 +1910,14 @@ const LANG = {
       { title:'Enable if disabled', body:"Run in PowerShell (Admin): Enable-ComputerRestore -Drive 'C:\\'" },
     ],
   },
-  fi: {
-    subtitles: {
-      'dashboard':'Järjestelmän yleiskatsaus','restore-points':'Luo ja hallinnoi palautuspisteitä',
-      'process-manager':'Reaaliaikainen prosessiseuranta','fixes':'Yleiset järjestelmäkorjaukset',
-      'preflight':'Diagnosoi järjestelmän tila','windows-opti':'Suorituskykyrekisterin säädöt',
-      'debloater':'Poista turhia ohjelmia','network':'Verkkopinon optimoinnit',
-      'hardware':'Prosessori, näytönohjain & virta-asetukset','startup-manager':'Hallinnoi käynnistysohjelmia',
-      'game-opti':'Pelikohtaiset optimointiprofiilit','app-optimizer':'Sovelluskohtainen säätö',
-      'fivem':'FiveM & GTA V -säädöt','cleanup':'Puhdista väliaikaistiedostot ja välimuistit',
-      'ping-test':'Testaa verkon viive','scheduler':'Tehtävien ajoitusten hallinta',
-      'changelog':'Käytettyjen säätöjen historia','personalization':'Teema- ja näyttöasetukset',
-      'latency-monitor':'Reaaliaikainen viiveseuranta','tweak-profiles':'Tallenna ja lataa säätöprofiilit',
-      'pulse':'Pelitehokkuustila — ajastin, ytimien aktivointi, keskeytysreititys',
-    },
-    sections: {
-      'Game Overlays':'Pelinäytöt',
-      'Telemetry & Privacy':'Telemetria & yksityisyys',
-      'Visual & UI Performance':'Visuaalinen suorituskyky',
-      'Background & Services':'Tausta & palvelut',
-      'Registry & Scheduling':'Rekisteri & ajoitus',
-      'Timer & Interrupts':'Ajastin & keskeytykset',
-      'GPU & Rendering':'Näytönohjain & renderöinti',
-      'File System':'Tiedostojärjestelmä',
-      'Input & Aim':'Syöte & tähtäys',
-      'Privacy & Telemetry (Extended)':'Yksityisyys & telemetria (laajennettu)',
-      'Security Services (Advanced)':'Tietoturvapalvelut (edistynyt)',
-      'CPU Scheduling':'Prosessorinajoitus',
-      'Power Plan':'Virtasuunnitelma',
-      'Storage':'Tallennus',
-      'GPU Advanced':'Näytönohjain (edistynyt)',
-      'Memory & Mitigations':'Muisti & suojaukset',
-      'AMD GPU':'AMD-näytönohjain',
-      'Audio':'Ääni',
-      'TCP Stack':'TCP-pino',
-      'DNS':'DNS',
-      'Bandwidth & QoS':'Kaistanleveys & QoS',
-      'NIC Offloads & Latency':'Verkkokortin siirrot & viive',
-      'Protocol Cleanup':'Protokollien siivous',
-      'Cache & Shaders':'Välimuisti & shaderit',
-      'CPU & I/O Priority':'Prosessori- & I/O-prioriteetti',
-      'Network':'Verkko',
-      'VM & Memory':'VM & muisti',
-      'FiveM Startup':'FiveM-käynnistys',
-      'FiveM Safety':'FiveM-turvallisuus',
-      'UWP App Removal':'UWP-sovellusten poisto',
-      'Startup Programs':'Käynnistysohjelmat',
-      'Startup & Services':'Käynnistys & palvelut',
-      'Results':'Tulokset',
-      'Schedule a Task':'Ajasta tehtävä',
-      'Active Scheduled Tasks':'Aktiiviset ajoitetut tehtävät',
-      'Scheduled Tasks':'Ajoitetut tehtävät',
-      'Unused / Ghost Devices':'Käyttämättömät / haamulitteet',
-      'Services':'Palvelut',
-      'Game DVR & Scheduling':'Game DVR & ajoitus',
-      'GPU Performance':'Näytönohjainsuorituskyky',
-      'Network (Ping & Stability)':'Verkko (ping & vakaus)',
-      'Memory & Virtual Memory':'Muisti & virtuaalimuisti',
-      'Launch & Commandline':'Käynnistys & komentorivi',
-      'CitizenFX.ini Advanced Tweaks':'CitizenFX.ini lisäsäädöt',
-      'System Integration':'Järjestelmäintegraatio',
-      'Browsers':'Selaimet',
-      'Communication':'Viestintä',
-      'Media':'Media',
-      'Launchers':'Käynnistysohjelmat',
-      'Streaming':'Suoratoisto',
-      'System':'Järjestelmä',
-      'System Junk':'Järjestelmäromu',
-      'Browser Caches':'Selainvälimuistit',
-      'App Caches':'Sovellusvälimuistit',
-      'FiveM / GTA':'FiveM / GTA',
-      'Old & Leftover Files':'Vanhat & jäljellä olevat tiedostot',
-    },
-    ui: {
-      apply:'Käytä', restore:'Palauta', runFix:'Suorita korjaus', done:'Valmis', running:'Suoritetaan…',
-      confirm:'Vahvista', back:'Takaisin', next:'Seuraava', close:'Sulje',
-      advanced:'Lisäasetukset', language:'Kieli', langCode:'FI',
-      preApplied:'Jo aktiivisena järjestelmässäsi — uudelleen käyttäminen on turvallista mutta turhaa.',
-      safetyRequired:'Turvatoggle vaaditaan',
-      safetyRequiredMsg:'Käännä turvatoggle ennen kuin käytät tätä säätöä.',
-      rebootRequired:'Uudelleenkäynnistys vaaditaan',
-      rebootMsg:'Uudelleenkäynnistys vaaditaan, jotta kaikki muutokset tulevat voimaan.',
-      rebootNow:'Käynnistä uudelleen',
-      later:'Myöhemmin',
-      fixesHero:'Nopeat korjaukset yleisiin Windows-ongelmiin. Jokainen korjaus on kohdennettu ja turvallinen.',
-      pulseSubtitle:'Pelitehokkuustila — ajastin, ytimien aktivointi, keskeytysreititys',
-      pulseActive:'AKTIIVINEN', pulseSelectGame:'VALITSE PELI', pulseKillBg:'Sulje taustaohjelmat',
-      pulseActivate:'Aktivoi Pulse', pulseDeactivate:'Deaktivoi',
-      pulseLiveMonitor:'Live-monitori', pulseActiveLabel:'Aktiivinen:',
-      startupSub:'Hallitse käynnistyksen ohjelmia ja palveluita. Tarpeettomien kohteiden poistaminen nopeuttaa käynnistystä ja vapauttaa RAM-muistia.',
-      startupRefresh:'Päivitä', startupRecommended:'Suositeltu PC:lleni',
-      startupImpact:'Vaikutus: ■ Korkea = poista &nbsp; ■ Keski = valinnainen &nbsp; ■ Matala = pidä',
-      startupLoading:'Ladataan käynnistysohjelmia…',
-      startupTip:'KORKEAN vaikutuksen kohteet tuntemattomilla nimillä ovat usein mainosohjelma- tai haittaohjelma-alkiot — turvallista poistaa.',
-      pingHeroTitle:'Pelipalvelimen ping-testi',
-      pingHeroSub:'Mittaa viiveesi suurille pelipalvelimille. Aja ennen ja jälkeen verkkosäätöjen nähdäksesi todellisen parannuksen.',
-      pingRun:'Aja ping-testi', pingStatusReady:'Napsauta aloittaaksesi — testaa 12 palvelinta (kestää ~25 sekuntia)',
-      pingNoResults:'Ei tuloksia vielä — napsauta Aja testataksesi.',
-      pingResultsSub:'Ping ms. Vihreä < 40ms · Keltainen 40–100ms · Punainen > 100ms',
-      pingTip:'Verkkosäätöjen (Nagle pois, DNS muutos, QoS poisto) jälkeen aja testi uudelleen vertaillaksesi viivettä.',
-      schedHeroTitle:'Säätöajastin',
-      schedHeroSub:'Aikatauluta säädöt ja ylläpitotehtävät automaattisesti Windowsin tehtäväajastimella. Tehtävät suoritetaan SYSTEM-oikeuksilla ja säilyvät uudelleenkäynnistyksen jälkeen.',
-      schedSectionSub:'Luo tehtäviä, jotka suoritetaan automaattisesti käynnistyksessä, kirjautumisessa tai aikataulun mukaan.',
-      schedTaskLabel:'Tehtävä', schedWhenLabel:'Milloin',
-      schedOptCleanTemp:'Tyhjennä väliaikaistiedostot', schedOptFlushDns:'Tyhjennä DNS-välimuisti',
-      schedOptNvidiaCache:'Tyhjennä NVIDIA-varjostinvälimuisti', schedOptDefrag:'Optimoi C:\\ asema',
-      schedOptStartup:'Joka PC-käynnistys', schedOptLogin:'Joka kirjautuminen',
-      schedOptDaily:'Päivittäin klo 3:00', schedOptWeekly:'Viikoittain (sunnuntai klo 3)',
-      schedAdd:'+ Ajasta', schedLoading:'Ladataan…',
-      schedTip:'Tehtävät suoritetaan SYSTEM-oikeuksilla. "Joka PC-käynnistys" on ihanteellinen väliaikaistiedostojen tyhjentämiseen.',
-      preflightHeroTitle:'Esidiagnostiikka',
-      preflightHeroSub:'Skannaa järjestelmäsi mukautettujen käyttöjärjestelmien (AtlasOS, ReviOS, Tiny11), sovellettujen skriptien (Chris Titus, Sophia) ja säätöjen varalta, jotka voivat aiheuttaa ristiriitoja. Suorita ennen säätöjen käyttämistä.',
-      preflightRunScan:'Suorita skannaus', preflightReady:'Napsauta Suorita skannaus analysoidaksesi järjestelmäsi',
-      scanTitle:'Asennettujen sovellusten skanneri',
-      scanDesc:'Skannaa PC:si havaitaksesi, mitkä bloatware-ohjelmat ovat oikeasti asennettuja. Vain asennetut sovellukset näkyvät oletuksena valittuina.',
-      scanStatus:'Ei skannattu vielä — napsauta Skannaa havaitaksesi asennetut sovellukset.',
-      scanBtn:'Skannaa asennetut sovellukset', scanGaming:'Pelisuositus',
-      scanGamingHint:'Valitsee turvallisesti poistettavat sovellukset pelaamiseen',
-      uwpSub:'Poista valinta sovelluksista, jotka haluat säilyttää. Skannaa ensin nähdäksesi mitä on asennettuna.',
-      uwpAll:'Kaikki', uwpNone:'Ei mitään', uwpSafeOnly:'Vain turvalliset', uwpNotScanned:'ei skannattu',
-      uwpRemove:'Poista valitut sovellukset',
-      uwpTip:'Poistetut UWP-sovellukset voidaan asentaa uudelleen Microsoft Storesta tarvittaessa.',
-      tasksSub:'Taustatehtävät, jotka lähettävät telemetriatietoja tai synkronoivat dataa. Turvallista poistaa käytöstä.',
-      taskCaution:'Varoitus', tasksGaming:'Pelisuositus', tasksDisable:'Poista käytöstä valitut',
-      devicesSub:'Laitteet, joissa on virheitä tai joita ei ole enää yhdistetty. Niiden poistaminen on turvallista ja siistii Laitehallintaa.',
-      devicesReady:'Napsauta Skannaa havaitaksesi käyttämättömät laitteet.',
-      devicesScan:'Skannaa laitteet', devicesRemove:'Poista käytöstä valitut',
-      servicesSub:'Väärän palvelun poistaminen voi rikkoa Windowsin toimintoja. Lue varoitukset huolellisesti.',
-      servicesGaming:'Pelisuositus', servicesDisable:'Poista käytöstä valitut',
-      servicesWSearch:'Hidastaa tiedostohakuja Explorerissa.',
-      networkWifiTip:'Wi-Fi havaittu ({adapter}). Osa verkkosäädöistä on suunnattu Ethernetille ja voi aiheuttaa epävakautta Wi-Fi-yhteydellä. Etene varoen.',
-      networkPingTip:'Ping-vinkki: Cloudflare DNS + QoS pois + NetBIOS/WPAD pois + Nagle pois = alhaisin vakaa ping.',
-      fivemOrderTip:'Paras järjestys: Luo RP → Tyhjennä välimuisti → Defender-poikkeus → MMCSS → FSO → GPU-asetukset → Verkko → Käynnistä FiveM uudelleen.',
-      fivemGpuRebootTip:'GPU-säätöjen jälkeen käynnistä PC uudelleen, jotta Hardware Scheduling tulee voimaan.',
-      fivemCfgTip:'CitizenFX.ini-säädöt (grass, LOD, worker threads) vaativat FiveM-uudelleenkäynnistyksen.',
-      fivemModScanBtn:'Skannaa konfliktit', fivemModScanStatus:'Skannaa FiveM-plugin-kansiot ja GTA V -hakemiston',
-      fivemModSectionSub:'Skannaa GTA V- ja FiveM-kansiot modeista tai ASI-liitännäisistä, jotka aiheuttavat kaatumisia, suorituskykyongelmia tai anticheat-lippuja.',
-      appOptiTip:'Vinkki: Käytä kaikki selainoptimistioinnit vapauttaaksesi 200–500 Mt GPU-muistia pelatessa. Selaimet kuluttavat merkittävästi VRAM-muistia laitteistokiihdytyksen ollessa käytössä.',
-      cleanupTip:'Väliaikaistiedostot ja välimuistit rakentuvat automaattisesti uudelleen. Aja pikasiivous kuukausittain parhaan tuloksen saamiseksi.',
-      rpHeroTitle:'Järjestelmän palautuspisteet',
-      rpHeroDesc:'Luo ja palauta järjestelmävedoksia — kaikki tästä sovelluksesta. Luo palautuspiste ennen MINKÄÄN säätöjen käyttämistä.',
-      rpCreate:'Luo palautuspiste', rpEnableSR:'Ota SR käyttöön C:\\',
-      rpNoSession:'Ei palautuspistettä luotu tässä sessiossa.',
-      rpSectionTitle:'Sovelluksen sisäinen järjestelmän palautus',
-      rpSectionSub:'Valitse palautuspiste ja napsauta Palauta palataksesi',
-      rpRefresh:'Päivitä lista', rpOpenRstrui:'Avaa rstrui.exe',
-      rpTableSeq:'#', rpTableDesc:'Kuvaus', rpTableDate:'Päivämäärä / Aika',
-      rpLoading:'Ladataan palautuspisteitä…', rpRestoreLabel:'Palauta pisteeseen:',
-      rpRestoreBtn:'Palauta valittuun pisteeseen',
-      rpRestoreWarn:'Tallenna kaikki työ ennen palautusta. Järjestelmä KÄYNNISTYY uudelleen.',
-      gpReadyTitle:'Valmis konfiguroitavaksi', gpReadyActiveTitle:'Profiili aktiivinen',
-      gpReadySub:'Hienosäädä profiilia ennen käyttöönottoa.',
-      gpReadyActiveSub:'KORKEA CPU/IO-prioriteetti, MMCSS, Defender-poikkeus käytössä.',
-      gpCoreSettings:'PERUSASETUKSET', gpApplyProfile:'Käytä profiili', gpRestoreDefaults:'Palauta oletukset',
-      gpAutoProfile:'AUTOMAATTINEN PROFIILI KÄYNNISTYKSESSÄ', gpNoProfile:'— Ei profiilia —',
-      gpWhatApplies:'MITÄ TÄMÄ KÄYTTÄÄ',
-      gpWatcherOn:'Poista autoprofiilit', gpWatcherOff:'Ota autoprofiilit käyttöön',
-      fivemHeroTweaks:'Järjestelmäsäädöt',
-      fivemHeroTweaksDesc:'Rekisteri, prosessoriprioriteetti, näytönohjainten ajoitus, verkko, muisti ja CitizenFX.ini-optimoinnit.',
-      fivemHeroTweaksCount:'14 säätöä alla',
-      fivemHeroGraphics:'Grafiikka-asetukset',
-      fivemHeroGraphicsDesc:'Muokkaa gta5_settings.xml-tiedostoa suoraan — varjojen laatu, LOD, reunanpehmennys, tiheys ja 29 muuta asetusta.',
-      fivemHeroGraphicsOpen:'Avaa erillisessä ikkunassa',
-      fivemSectionLabel:'Järjestelmäsäädöt',
-      aoApplied:'KÄYTÖSSÄ', aoDefault:'OLETUS',
-      cleanupQuickCleanTitle:'Pikasiivous',
-      cleanupQuickCleanDesc:'Suorittaa kaikki turvalliset siivoustehtävät yhdellä napsautuksella — ohittaa vaaralliset kohteet, jotka vaativat vahvistuksen.',
-      cleanupQuickCleanBtn:'Pikasiivous', cleanupEstimateBtn:'Arvioi koko',
-      cleanupConfirmWipe:'Vahvista pyyhintä', cleanupConfirmDism:'Vahvista DISM',
-      cleanupConfirmClear:'Vahvista tyhjennys', cleanupConfirmDelete:'Vahvista poisto',
-      cleanupSysJunk:'Järjestelmäromu', cleanupBrowserCaches:'Selainvälimuistit',
-      cleanupAppCaches:'Sovellusvälimuistit', cleanupFivemSection:'FiveM / GTA',
-      cleanupOldFiles:'Vanhat & jäljellä olevat tiedostot',
-      historyTitle:'Säätöhistoria',
-      historySubtitle:'Jokainen käytetty tai palautettu säätö aikaleiman kera. Yksittäinen kumoaminen yhdellä napsautuksella.',
-      historyRefresh:'Päivitä', historyClear:'Tyhjennä historia',
-      historyApplied:'Käytetty', historyRestored:'Palautettu',
-      historyEmpty:'Ei historiaa vielä. Käytä säätöjä ja ne ilmestyvät tähän.',
-      historyLoading:'Ladataan historiaa…', historyCount:'merkintää',
-      latencyTitle:'DPC / ISR -viivemonitori',
-      latencySubtitle:'Reaaliaikainen ytimen keskeytysviive. Korkea DPC/ISR % aiheuttaa äänihäiriöitä ja syöteviivettä.',
-      latencyWhatTitle:'Mitä tämä tarkoittaa?',
-      latencyRow1:'<strong>DPC &lt; 1%</strong> — Erinomainen. Ei keskeytysviiveongelmia.',
-      latencyRow2:'<strong>DPC 1–3%</strong> — Kohtalainen. Pieniä äänihäiriöitä mahdollisia kuormituksessa.',
-      latencyRow3:'<strong>DPC &gt; 3%</strong> — Korkea. Yleisiä syitä: huonot ajurit (verkko, ääni, GPU), vanha BIOS, C-tilat.',
-      latencyRow4:'<strong>Ajastimen tarkkuus</strong> — Windowsin oletusarvo on 15 625 µs. Pelit laskevat sen ~500 µs:iin. Pienempi = tarkempi ajoitus.',
-      latencyFixTitle:'Pika-korjaukset',
-      latencyFix1:'Käytä <strong>C-tilat pois</strong> Edistynyt → Laitteistosäädöt',
-      latencyFix2:'Käytä <strong>MSI-tila</strong> ottaaksesi sanomakeskeytysviestin käyttöön',
-      latencyFix3:'Päivitä tai peru ääni/verkkokorttien ajurit, jos DPC on jatkuvasti korkea',
-      latencyFix4:'Ota HPET käyttöön tai poista se käytöstä alustasi mukaan (kokeile molempia)',
-      pfOsType:'KÄYTTÖJÄRJESTELMÄTYYPPI', pfSafetyScore:'TURVALLISUUSPISTEET',
-      pfScoreBreakdown:'Pistelaskelma',
-      pfSafe:'Turvallinen säätää', pfCaution:'Etene varoen', pfHighRisk:'Korkea riski — tarkista ristiriidat',
-      pfDetections:'Havainnot', pfConflicts:'Ristiriitaiset säädöt', pfRecommendations:'Suositukset',
-      pfScanning:'Skannataan…', pfAnalyzing:'Analysoidaan järjestelmän kokoonpanoa…',
-      pfScanComplete:'Skannaus valmis · Turvallisuuspisteet:',
-      pfScanFailed:'Skannaus epäonnistui',
-      pfNoConflicts:'Ei ristiriitoja havaittu. Järjestelmä on puhdas — kaikki säädöt on turvallista käyttää.',
-      pfNoTweaks:'Ei esikäytettyjä säätöjä. Järjestelmäsi on puhdas — voit käyttää mitä tahansa säätöä alusta alkaen.',
-      pfTweaksApplied:'säätöä jo käytössä järjestelmässäsi',
-      pfTweaksSkip:'Ohita nämä — uudelleen käyttäminen on turhaa. Auto-optimointi ohittaa ne automaattisesti.',
-      pfGoTo:'Siirry',
-      pfRecAutoOpti:'Järjestelmässäsi on paljon esikäytettyjä säätöjä. Auto-optimointi ohittaa jo aktiiviset säädöt automaattisesti.',
-      pfRecFiveM:'{n} FiveM-säätöä{s} havaittu — siirry FiveM-välilehteen tarkistamaan asetukset.',
-      pfRecNetwork:'{n} verkkoasetus{s} jo aktiivinen. Verkkokorttiasetukset koskevat vain Ethernetiä — Wi-Fi jätetään aina pois.',
-      pfRecNoCore:'Ei ydinasäätöjä havaittu — aja Auto-optimointi käyttääksesi täyden suositellusäätöjoukon yhdellä napsautuksella.',
-      pfBtnRerun:'Suorita skannaus',
-      pfHigh:'KORKEA', pfMedium:'KESKI', pfLow:'MATALA',
-      pfOsCustom:'Mukautettu/siivottu käyttöjärjestelmä havaittu', pfOsModified:'Muokattu käyttöjärjestelmä havaittu',
-      pfConflictDetected:'ristiriitainen säätö{s} havaittu',
-      pfHighSeverity:'korkean vakavuuden havainto{s}',
-      pfMedSeverity:'keskitason havainto{s}',
-      pfNoIssues:'Ei ongelmia havaittu',
-    },
-    titles: {
-      'dashboard':'Etusivu','restore-points':'Järjestelmän palautus','process-manager':'Prosessit',
-      'fixes':'Korjaukset','preflight':'Esidiagnostiikka',
-      'windows-opti':'Yleiset säädöt','debloater':'Siivous','network':'Verkko',
-      'hardware':'Edistynyt','startup-manager':'Käynnistys','game-opti':'Peliprofiilit',
-      'app-optimizer':'Sovellusoptimoija','fivem':'FiveM','cleanup':'Puhdistus',
-      'ping-test':'Ping-testi','scheduler':'Ajastus','changelog':'Säätöhistoria',
-      'personalization':'Mukauttaminen','latency-monitor':'Viivevalvonta',
-      'tweak-profiles':'Säätöprofiilit','pulse':'Pulse',
-    },
-    aomQuestions: [
-      { label:'Käytätkö Microsoft Edgeä?',                         sub:'Ei = Edgen taustapalvelut poistetaan käytöstä' },
-      { label:'Käytätkö Google Chromea?',                          sub:'Ei = Chromen taustatoiminnot rajataan' },
-      { label:'Käytätkö Bluetooth-laitteita?',                     sub:'Ei = Bluetooth-palvelut poistetaan kokonaan' },
-      { label:'Käytätkö Xbox-sovellusta / Game Passia?',           sub:'Ei = Xbox-palvelut ja Game Bar poistetaan' },
-      { label:'Käytätkö OneDrivea?',                               sub:'Ei = OneDriven käynnistys ja synkronointi poistetaan' },
-      { label:'Käytätkö Cortanaa / Windowsin hakua?',              sub:'Ei = Cortana ja WSearch-indeksoija poistetaan' },
-      { label:'Käytätkö tulostinta?',                              sub:'Ei = Print Spooler -palvelu poistetaan käytöstä' },
-      { label:'Käytätkö lepotilaa / horrostilaa?',                 sub:'Ei = Horrostila poistetaan, vapauttaa levytilaa' },
-      { label:'Käytätkö StickyKeys-toimintoa / esteettömyysnäppäimiä?', sub:'Ei = StickyKeysin vahingollinen laukaisu estetään' },
-      { label:'Onko sinulla kolmannen osapuolen virustorjunta?',   sub:'Kyllä = Defenderin ilmoitukset hiljennetään' },
-    ],
-    aomLang: { title:'Valitse kieli', sub:'Voit vaihtaa kielen milloin tahansa otsikkopalkista.', en:'Englanti', fi:'Suomi' },
-    tweakDescs: {
-      'game-dvr':'Poistaa taustanauhauksen kuormituksen — vähentää prosessori- ja näytönohjainkulutusta pelatessa, vaikka et nauhoittaisi.',
-      'disable-fso':'Estää Windowsia renderöimästä pelejä hybriditilassa. Vähentää syötteen viivettä eksklusiivisessa koko näytön tilassa.',
-      'telemetry':'Estää Windowsia lähettämästä käyttötietoja Microsoftille. Vapauttaa taustaprosessorin ja levyaktiivisuuden.',
-      'cortana':'Pysäyttää indeksoijan taustalla käyttämän levyn I/O:n. Tiedostohaut Explorerissa hidastuvat.',
-      'win-tips':'Poistaa ehdotukset ja vinkit, jotka ilmestyvät näytölle ja kuluttavat resursseja.',
-      'visual-effects':'Poistaa Aeron, tehtäväpalkin animaatiot ja ikkunavarjot. Vapauttaa näytönohjain-/prosessorikulutusta matalan VRAM-järjestelmissä.',
-      'explorer-perf':'Poistaa 10 sekunnin Explorerin käynnistysviiveen ja asettaa Tämä tietokone oletussivuksi.',
-      'hibernate':'Poistaa hiberfil.sys-tiedoston (noin RAM:in kokoinen). Vapauttaa merkittävästi levytilaa.',
-      'disable-mouse-accel':'Poistaa Paranna osoittimen tarkkuutta koko järjestelmästä. Hiiri liikkuu 1:1-suhteessa ilman Windowsin käyrää. Välttämätön tasaiselle tähtäykselle.',
-      'disable-background-apps':'Pysäyttää kaikki UWP-sovellukset (Uutiset, Sää, Posti, Xbox jne.) ajamasta hiljaa taustalla. Todellinen prosessori- ja RAM-säästö pelatessa.',
-      'disable-auto-maintenance':'Estää Windowsia suorittamasta levyskannauksia, eheytyksiä ja tietoturvatarkistuksia session aikana. Poistaa taustatehtävien aiheuttamat kuvaajan piikit.',
-      'disable-delivery-opt':'Estää Windowsia käyttämästä internet-yhteyttäsi päivitysten lataamiseen muille tietokoneille. Poistaa taustakäytön ja prosessorikulutuksen sessioiden aikana.',
-      'usb-suspend':'Estää Windowsia katkaisemasta virtaa USB-laitteilta syötteiden välissä. Poistaa mikronykäykset ja yhteysongelmat hiirissä ja kuulokkeissa pelin aikana.',
-      'mmcss':'Määrittää Windowsin multimedialuokka-ajoittajan maksimoimaan prosessorin aikaviipaleet peleille. SystemResponsiveness asetetaan arvoon 10 (turvallinen) — ei koskaan 0, joka tukahduttaisi USB/HID-ohjaimet.',
-      'priority-sep':'Saa aktiivisen ikkunan vastaanottamaan huomattavasti enemmän prosessoriaikaa kuin taustaohjelmat.',
-      'sysmain':'Lopettaa sovellusten esilatauksen RAM-muistiin. Parhaiten 16 Gt+ RAM:lla. Voi heikentää suorituskykyä vähemmällä.',
-      'power-throttling':'Estää Windowsia alentamasta kellotaajuuksia taustaprosesseille.',
-      'hpet':'Poistaa alustan kellon bcdeditin kautta. Parantaa FPS-tasaisuutta monilla prosessoreilla. Uudelleenkäynnistys vaaditaan.',
-      'tsc-sync':'Parantaa ajastimen synkronointia prosessoriytimien välillä. Pieni FPS-tasaisuuden parannus. Uudelleenkäynnistys vaaditaan.',
-      'msi-mode':'Korvaa vanhan keskeytyksen käsittelyn. Vähentää keskeytyksen viivettä. Uudelleenkäynnistys vaaditaan.',
-      'gpu-hwsch':'Siirtää näytönohjainkomentojen ajoituksen prosessorilta näytönohjainohjaimen tehtäväksi. Vähentää kehysviivettä. Uudelleenkäynnistys vaaditaan.',
-      'tdr-delay':'Estää näytönohjainohjaimen aikakatkaisu-kaatumisia raskaassa DXR/modding-kuormituksessa.',
-      'ntfs':'Vähentää metatietojen kuormitusta jokaisessa tiedoston luku-/kirjoitusoperaatiossa. Mitattava parannus kiireisillä SSD-asemilla.',
-      'memory-compression':'Lopettaa RAM-sisällön pakkaamisen. Vähentää prosessorikulutusta, voi lisätä sivutustiedoston käyttöä.',
-      'spectre-meltdown':'VAROITUS: Poistaa prosessoriturvallisuuden lieventämistoimenpiteet. FPS-hyöty tietoturvan kustannuksella. VAIN omistautuneilla pelikoneilla.',
-      'bcd-tweaks':'Poistaa käynnistysvalikon aikakatkaisun, poistaa käynnistyslokin käytöstä. Hieman nopeampi POST. Uudelleenkäynnistys vaaditaan.',
-      'raw-aim-curve':'Asettaa MouseSensitivity-rekisterikäyrän tasaiseen 1:1-raakasynötetaulukkoon. Poistaa kaikki piilotetut Windowsin osoitinkäyrät täydellisen tähtäystasaisuuden saavuttamiseksi.',
-      'proximity-deny':'Poistaa Windowsin Nearby Sharing -palvelun. Lopettaa tausta-Bluetooth/Wi-Fi-läheisyysskannaukset, jotka aiheuttavat mikronykäyksiä.',
-      'cursor-max-rate':'Asettaa HIDDeviceInputProcessingMode=0 sallimaan erittäin korkean kyselynopeuden hiiret (jopa 8000 Hz) ilman Windowsin nopeusrajoitusta.',
-      'nudge-blocker':'Poistaa AutoPlay-ilmoitukset, jotka ilmestyvät USB-laitteiden liittämisen yhteydessä pelin aikana.',
-      'sticky-keys-guard':'Poistaa StickyKeysin, FilterKeysin ja ToggleKeysin pikanäppäimet kokonaan. Estää niiden laukaisemisen vahingossa pelin aikana.',
-      'usb-power-guard':'Asettaa USB-hubin valikoivan keskeytyksen pois käytöstä kaikissa virta-asetelmissa. Estää USB-laitteiden yhteyden katkeamisen käyttämättömyyden aikana.',
-      'cpu-parking':'Estää Windowsia pysäyttämästä prosessoriytimien aktiviteettia. Kaikki ytimet pysyvät aktiivisina. Tärkeä latenssiherkkiin peleihin.',
-      'spectre-meltdown':'Poistaa prosessorisuojaukset käytöstä — FPS-hyöty tietoturvan kustannuksella.',
-      'nvidia-max-perf':'Pakottaa NVIDIA-näytönohjaimen käymään maksimikelloilla aina — ei automaattista alikellotusta.',
-      'nvidia-low-latency':'Aktivoi NVIDIA:n Ultra Low Latency -tilan. Vähentää kehysten jonottamista ennen renderöintiä.',
-      'cpu-parking':'Poistaa ydinpysäköinnin käytöstä — kaikki ytimet pysyvät aktiivisina matalan latenssin pelikäyttöön.',
-      'nvme-latency':'Optimoi NVMe-tallennuksen latenssia StorPort-rekisterisäädöillä.',
-      'pcie-power':'Poistaa PCIe-linkin virranhallinnan käytöstä. Estää näytönohjainkaistan kaventumisen.',
-      'tcp-stack':'Optimoi TCP-vastaanottopuskurin, lähetysikkunan ja taajuuskaistanleveysmittauksen. Vähentää pakettiviivettä moninpelissä.',
-      'tcp-buffers':'Asettaa AutoTuning-tason ja lisää TCP-puskurikokoa. Parantaa suorituskykyä korkean kaistanleveyden yhteyksissä.',
-      'winsock-reset':'Nollaa Winsock-katalogi tehdasasetuksiin. Korjaa viiveet ja pakettikatot viallisten verkkopinon muutosten jälkeen.',
-      'flush-dns':'Tyhjentää DNS-välimuistin välittömästi. Hyödyllinen nimen ratkaisun häiriöiden tai VPN-vaihtojen jälkeen.',
-      'dns-cloudflare':'Asettaa ensisijaiseksi DNS:ksi Cloudflaren 1.1.1.1 ja 1.0.0.1. Nopeammat kyselyt, vahvempi yksityisyys.',
-      'dns-google':'Asettaa ensisijaiseksi DNS:ksi Googlen 8.8.8.8 ja 8.8.4.4. Luotettava, nopea ja laajasti tuettu.',
-      'qos-reserve':'Poistaa 20 %:n kaistanleveyden varauksen, jonka Windows pitää QoS:lle. Antaa verkkosovelluksille täyden kaistanleveyspääsyn.',
-      'net-throttling':'Poistaa Windows-verkon kuristuksen suoratoiston ja pelisessioiden aikana. Vähentää keinotekoista kuristusta korkean kuormituksen aikana.',
-      'nic-offloads':'Poistaa LSO:n (Large Send Offload) käytöstä verkkokortin tasolla. Laskee TCP-segmentoinnin prosessorille — vähentää verkon jäätymistä joillakin ajureilla.',
-      'nic-interrupt-mod':'Poistaa keskeytysten yhdistämisen käytöstä verkkokortin ajuritasolla. Laskee kaikkien verkkopakettien viivettä.',
-      'nic-flow-control':'Poistaa IEEE 802.3x -virtausohjauksen käytöstä. Estää verkkokorttia lähettämästä PAUSE-kehyksiä, jotka voivat aiheuttaa laajoja viivepiikkejä.',
-      'nic-energy-efficient':'Poistaa Energy Efficient Ethernet (EEE) -toiminnon käytöstä. Estää linkin lepotilan aiheuttaman viiveen, jota ilmenee verkkopakettien välissä.',
-      'disable-netbios':'Poistaa NetBIOS over TCP/IP -toiminnon käytöstä kaikilla verkkosovittimilla. Lopettaa UDP 137/138-lähetykset ja nimenselätys-viiveet.',
-      'disable-ipv6':'Poistaa IPv6-pinon käytöstä verkkosovittimella. Hyödyllinen järjestelmissä, joissa IPv6-osoitteiden selvitys hidastaa yhteyden muodostusta.',
-      'disable-wpad':'Poistaa Web Proxy Auto-Discovery (WPAD) -toiminnon käytöstä. Lopettaa verkon WPAD-kyselyt, jotka voivat lisätä selausviivettä.',
-      'intel-power-plan':'Aktivoi Intelin suositteleman virrankäyttösuunnitelman suorituskyvyn maksimoimiseksi prosessorilla. Estää kellotaajuuden laskemisen latenssiherkkien tehtävien aikana.',
-      'amd-power-plan':'Aktivoi AMD:n suositteleman virrankäyttösuunnitelman pelaamista ja latenssiherkkiä tehtäviä varten. Parempi kellotaajuuden ylläpito AMD-prosessoreilla.',
-      'cstates':'Poistaa prosessorin syvät C-tilat käytöstä BIOS/käynnistyksen kautta. Estää prosessoria nukahtamasta ytimien välillä — eliminoi heräämisviiveen.',
-      'speed-shift':'Ottaa HWP:n (Hardware P-State) käyttöön prosessorille. Antaa prosessorille itseohjautuvan kellotaajuuden skaalautuvuuden suorituskyvyn ja virransäästön välillä.',
-      'disable-hdcp':'Poistaa HDCP-kopiosuojauksen käytöstä GPU-ajuritasolla. Poistaa sisällönsuojauksen tarkistuksen aiheuttaman viiveen videolähdössä.',
-      'gpu-hags-off':'Poistaa Hardware-Accelerated GPU Scheduling (HAGS) -toiminnon käytöstä. Jotkut pelit toimivat vakaammin ilman sitä; suositellaan DX11-painotteisille peleille.',
-      'nvidia-pstate-lock':'Lukitsee NVIDIA:n virrankäyttötilan P0:aan (maksimi). Eliminoi kellotaajuuden laskun aiheuttamat FPS-piikit.',
-      'nvidia-profile':'Optimoi NVIDIA-suorituskykyprofiilia peligrafiikka-asetuksilla ohjauspaneelin kautta.',
-      'hvci-offload':'Siirtää HVCI-muistisuojauksen laskutoimituksia. Vähentää suojaustarkistuksen prosessorikulutusta joissakin kokoonpanoissa.',
-      'memory-guard-tune':'Säätää virtualisointipohjaisen suojauksen (VBS) muistinhallinnan parametreja. Pienentää suojauksen aiheuttamaa prosessori-ylimäärää.',
-      'full-mitigation-wipe':'VAROITUS: Poistaa KAIKKI prosessoriturvallisuuden lieventämistoimenpiteet. Maksimaalinen FPS-hyöty — merkittävä tietoturvariski. VAIN dedikoiduille pelikoneille.',
-      'process-count-reduction':'Poistaa tarpeettomia Windows-taustaprosesseja käytöstä. Vapauttaa RAM-muistia ja vähentää prosessoriaikaviipaleiden kilpailua.',
-      'amd-chill-off':'Poistaa AMD Chill -kehysnopeuden rajoittimen käytöstä. Estää kehysnopeuden kaventumisen hiirettömyyden aikana — erittäin tärkeä FPS-peleille.',
-      'amd-power-hold':'Poistaa AMD:n automaattisen virranrajoituksen käytöstä. Antaa GPU:n käyttää täyttä tehokiintiötä jatkuvasti.',
-      'amd-service-trim':'Poistaa tarpeettomat AMD-palvelut käytöstä (tilastot, päivitys, jne.). Vapauttaa taustaprosessoriresursseja.',
-      'corsair-audio-off':'Poistaa iCUE:n äänivisualisointipalvelun käytöstä. Poistaa jatkuvan mikrofoni-/äänilaiteanalyysin taustakuormituksen.',
-      'telemetry-zero':'Asettaa telemetriatason nollaan ja poistaa käytöstä kaikki diagnostiikkalähetysrajapinnat. Pysäyttää telemetriadata-ajastimet.',
-      'search-box-local':'Pakottaa tehtäväpalkin haun käyttämään vain paikallista indeksiä — ei Bing-ehdotuksia tai pilvihakuja. Nopeammat hakutulokset.',
-      'search-cloud-off':'Poistaa käytöstä kaikki pilvihakuominaisuudet Windows-hausta. Estää haun lähettämästä kyselyitä Bingiin tai OneDriveen.',
-      'cloud-sync-off':'Poistaa OneDrive-synkronoinnin, teemasynkronoinnin ja muiden Microsoft-palveluiden pilvitallennuksen käytöstä.',
-      'do-solo-mode':'Pakottaa Windows Updaten käyttämään vain Microsoft-palvelimia päivitysten lataamiseen. Estää muiden PC:iden käyttämisen siirtolähteenä.',
-      'reality-telephony-off':'Poistaa Täytetty Todellisuus ja Puhelinkumppani -palvelut käytöstä. Nämä toimivat taustalla ilman näkyvää käyttöä.',
-      'sensor-suite-off':'Poistaa sijainnin, liiketunnistimen ja ympäristövalotunnistimen palvelut käytöstä. Estää sovelluksia lukemasta anturidataa taustalla.',
-      'rt-scan-trim':'Karsii reaaliaikaisen tarkistuksen skannausaikataulua. Vähentää Defenderin taustakuormitusta session aikana.',
-      'security-quiet':'Poistaa Windowsin suojauksen ilmoitukset ja toimintakeskus-hälytykset käytöstä. Estää häiritsevät suojaus-popupit pelin aikana.',
-      'security-toast-off':'Poistaa Windowsin suojauksen ponnahdusilmoitukset käytöstä järjestelmäasemalla.',
-      'biometrics-off':'Poistaa Windows Hello biometriset palvelut (sormenjälki, kasvojentunnistus) käytöstä. Vapauttaa sensorien ja biometria-ajurin resurssit.',
-      'bluetooth-hard-off':'Poistaa Bluetooth-sovitinpalvelun käytöstä kokonaan. Käytä tätä vain jos sinulla ei ole Bluetooth-laitteita.',
-      'boot-sound-off':'Poistaa käynnistysäänen Windowsista. Pieni mukavuusasetus.',
-      'compat-scanner-off':'Poistaa sovellusten yhteensopivuusskannauksen käytöstä. Estää ohjelmistojen käynnistämisen hidastumisen yhteensopivuustarkistuksen takia.',
-      'compat-tasks-off':'Poistaa yhteensopivuustelemetrian ajastetut tehtävät käytöstä. Estää taustaskannauksen vanhojen ohjelmaversioiden varalta.',
-      'cortana-blackout':'Poistaa Cortana-prosessin ja indeksoinnin kokonaan käytöstä rekisteritasolla.',
-      'cortana-remnant-off':'Poistaa Cortanan jäljelle jääneet taustatehtävät ja päivitysajastimet käytöstä.',
-      'defender-core-off':'Poistaa Windows Defenderin reaaliaikaisen suojauksen käytöstä. KÄYTÄ VAIN jos sinulla on kolmannen osapuolen virustorjunta aktiivisena.',
-      'defender-quiet':'Asettaa Windows Defenderin passiiviseen tilaan. Ylläpitää perusvarmistuksen mutta poistaa aktiivisen tarkistuksen käytöstä.',
-      'diag-tasks-off':'Poistaa Windowsin diagnostiikkaajastetut tehtävät käytöstä. Estää DPS:n ja diagtrack-demonin käynnistymisen taustalla.',
-      'diagnostics-off':'Poistaa diagnostiikkapalvelut ja tapahtumaseurannan käytöstä. Vähentää levyn ja prosessorin käyttöä lokituksessa.',
-      'capability-ruleset':'Poistaa sovellusten ominaisuuksien tarkistukset käytöstä. Vähentää taustalokin kirjausta ominaisuusehdotuksille.',
-      'cpu-focus-bias':'Siirtää Windows-ajoittimen priorisointia aktiiviselle ikkunalle. Antaa enemmän prosessoriaikaa etualan sovellukselle.',
-    },
-    fixDescs: {
-      'fix-valorant-cfg':'Ottaa Control Flow Guard -suojauksen ja siihen liittyvät lieventämistoimenpiteet käyttöön Valorantia/Vanguardia varten.',
-      'fix-wifi':'Palauttaa TCP/IP-pinon ja Winsockin oletusasetukset. Korjaa yhteysongelmat, joita voi esiintyä verkko-optimointien jälkeen.',
-      'fix-search':'Käynnistää Windowsin hakuindeksoinnin uudelleen ja rakentaa hakuindeksin alusta. Korjaa Käynnistä-valikon haun toimimattomuuden.',
-      'fix-usb-ghosting':'Palauttaa USB-valikoivan keskeytyksen asetukset, jotka voivat aiheuttaa haamuhiirtä, äänimerkkejä tai USB-katkoksia.',
-      'fix-phantom-hid':'Poistaa haamukäyttöliittymä-/USB-laitteet (tila: Tuntematon), joita jää jäljelle poistettaessa ohjelmistoja kuten Logitech G HUB ja näppäimistöohjaimet.',
-    },
-    fixNames: {
-      'fix-valorant-cfg':'Valorant CFG-korjaus',
-      'fix-valorant-hvci':'Valorant HVCI-muisti-eheys-korjaus',
-      'fix-nvidia-cp':'NVIDIA-ohjauspaneeli (ei Microsoft Storea)',
-      'fix-wifi':'Wi-Fi-korjaus',
-      'fix-bluetooth':'Bluetooth-korjaus',
-      'fix-2502':'Virhe 2502/2503 -korjaus',
-      'fix-ms-store':'Microsoft Store/päivitys-korjaus',
-      'fix-audio':'Äänikorjaus',
-      'fix-winsock':'Verkkopinon nollaus',
-      'fix-windows-defender':'Windows Defender -nollaus',
-      'fix-print-spooler':'Tulostimen taustapalvelun korjaus',
-      'fix-search':'Windows-haun korjaus',
-      'fix-usb-ghosting':'Haamuohjaimen / äänimerkki-korjaus',
-      'fix-phantom-hid':'Poista haamu-HID/USB-laitteet',
-    },
-    rpCards: [
-      { title:'Mikä on suojattu?', body:'Rekisterimuutokset, järjestelmätiedostot ja ohjainasennukset. Henkilökohtaisia tiedostoja EI suojata.' },
-      { title:'Levytilan käyttö?', body:'Windows käyttää enintään 10 % suojatusta asemasta. Vähennä tätä Järjestelmän ominaisuudet → Järjestelmän suojaus -kohdasta.' },
-      { title:'Ota käyttöön jos pois', body:"Suorita PowerShellissä (Admin): Enable-ComputerRestore -Drive 'C:\\'" },
-    ],
-    taskDescs: {
-      'Microsoft Compatibility Appraiser':'Lähettää sovellusten yhteensopivuustietoja Microsoftille',
-      'ProgramDataUpdater':'Kerää ohjelmatelemetriatietoja',
-      'Proxy':'Tarkistaa levyn käynnistyksen yhteydessä (telemetriaproxy)',
-      'Consolidator':'CEIP-datan konsolointi — lähettää käyttötietoja',
-      'UsbCeip':'USB-laitetelemetria',
-      'Microsoft-Windows-DiskDiagnosticDataCollector':'Levydiagnostiikan tiedonkeruu',
-      'DmClient':'Palauteilmoitukset / kyselyt',
-      'DmClientOnScenarioDownload':'Lataa palauteskenaarioita',
-      'MapsToastTask':'Karttojen päivitysilmoitukset',
-      'MapsUpdateTask':'Automaattiset karttatietojen päivitykset',
-      'FamilySafetyMonitor':'Perheen turvallisuuden seuranta',
-      'FamilySafetyRefreshTask':'Perheen turvallisuustietojen päivitys',
-      'QueueReporting':'Lähettää kaatumis-/virheraportteja Microsoftille',
-      'Automatic App Update':'Päivittää Store-sovellukset automaattisesti — poista harkiten',
-      'XblGameSaveTask':'Xbox-tallennusten synkronointi',
-      'CreateObjectTask':'Pilvikokemus / OneDrive-kehotukset',
-    },
-  }
 }
 
-function tUI(key) { return LANG[currentLang]?.ui?.[key] ?? LANG.en.ui[key] ?? key }
-function tSub(page) { return LANG[currentLang]?.subtitles?.[page] ?? LANG.en.subtitles[page] ?? '' }
-function tSection(title) { return LANG[currentLang]?.sections?.[title] ?? title }
-function tDesc(id) { return LANG[currentLang]?.tweakDescs?.[id] ?? null }
-function tFixDesc(id) { return LANG[currentLang]?.fixDescs?.[id] ?? null }
-
-function setLanguage(lang) {
-  currentLang = lang
-  settings.language = lang
-  api.saveSettings(settings).catch(() => {})
-  updateLangButton()
-  if (currentPage) showPage(currentPage)
-}
-
-function cycleLanguage() {
-  setLanguage(currentLang === 'en' ? 'fi' : 'en')
-}
-
-function updateLangButton() {
-  const btn = document.getElementById('lang-btn')
-  if (!btn) return
-  btn.textContent = tUI('langCode')
-}
-
-function initLanguage() {
-  currentLang = settings.language || 'en'
-  updateLangButton()
-}
+function tUI(key) { return LANG.en.ui[key] ?? key }
+function tSub(page) { return LANG.en.subtitles[page] ?? '' }
+function tSection(title) { return title }
+function tDesc(id) { return LANG.en.tweakDescs?.[id] ?? null }
+function tFixDesc(id) { return LANG.en.fixDescs?.[id] ?? null }
+function initLanguage() {}
 
 // ─── State ───────────────────────────────────────────────────────────────────
 let sysInfo = {}
@@ -2641,7 +2240,6 @@ const CMD_PAGES = [
   { name: 'Ping Test',     sub: 'Latency to game servers',page: 'ping-test',       icon: 'fa-satellite-dish' },
   { name: 'Scheduler',     sub: 'Automated tweaks',       page: 'scheduler',       icon: 'fa-clock' },
   { name: 'Tweak History', sub: 'Changelog of changes',   page: 'changelog',       icon: 'fa-clipboard-list' },
-  { name: 'Profiles',      sub: 'Saved tweak profiles',   page: 'tweak-profiles',  icon: 'fa-layer-group' },
   { name: 'Personalization',sub: 'Themes & accent colors',page: 'personalization', icon: 'fa-palette' },
 ]
 const CMD_ACTIONS = [
@@ -2781,10 +2379,12 @@ function showPage(page) {
       'app-optimizer': buildAppOptimizer, fivem: buildFiveM, cleanup: buildCleanup,
       'ping-test': buildPingTest, scheduler: buildScheduler, changelog: buildChangelog,
       personalization: buildPersonalization, 'latency-monitor': buildLatencyMonitor,
-      'tweak-profiles': buildTweakProfiles, pulse: buildPulse,
+      pulse: buildPulse,
+      'bios-tuner': buildBiosTuner,
     }
     builders[page]?.(c)
     setTimeout(addRippleToButtons, 50)
+    if (page === 'dashboard') setTimeout(loadDashboardTemps, 3500)
   }, 110)
 }
 
@@ -2890,6 +2490,16 @@ function applyTheme(themeKey) {
 
 function initPersonalization() {
   applyTheme(settings.theme || 'jylli')
+  if (settings.accentColor) {
+    const hex = settings.accentColor
+    const r = parseInt(hex.slice(1,3),16), g = parseInt(hex.slice(3,5),16), b = parseInt(hex.slice(5,7),16)
+    const root = document.documentElement
+    root.style.setProperty('--pink',       hex)
+    root.style.setProperty('--pink-hover', shadeColor(hex, 12))
+    root.style.setProperty('--pink-dim',   `rgba(${r},${g},${b},0.18)`)
+    root.style.setProperty('--pink-glow',  `rgba(${r},${g},${b},0.35)`)
+    root.style.setProperty('--pink-rgb',   `${r},${g},${b}`)
+  }
   initAdvancedMode()
   initLanguage()
 }
@@ -2956,9 +2566,59 @@ function buildPersonalization(c) {
       settings.theme = key
       api.saveSettings(settings)
       applyTheme(key)
+      // Sync picker to theme accent color
+      const picker = document.getElementById('accent-color-picker')
+      if (picker) picker.value = t.accent
+      delete settings.accentColor
     }
     grid.appendChild(card)
   })
+
+  // Accent color picker
+  const accentRow = document.createElement('div')
+  accentRow.style.cssText = 'margin-top:16px;display:flex;align-items:center;gap:12px;padding:0 2px'
+  accentRow.innerHTML = `
+    <label style="font-size:12px;color:var(--gray)">Custom accent</label>
+    <input type="color" id="accent-color-picker"
+      style="width:36px;height:28px;border:none;background:none;cursor:pointer;padding:0;border-radius:4px">
+    <button class="btn btn-ghost btn-sm" onclick="resetAccentColor()" style="font-size:11px">Reset</button>
+    <span style="font-size:11px;color:var(--gray)">Override the accent color for any theme</span>`
+  const sectionBody = c.querySelector('.section-body')
+  sectionBody.appendChild(accentRow)
+
+  // Set picker to current accent (custom or theme default)
+  const picker = document.getElementById('accent-color-picker')
+  const currentTheme = THEMES[settings.theme || 'jylli']
+  picker.value = settings.accentColor || currentTheme.accent
+
+  picker.addEventListener('input', e => {
+    const hex = e.target.value
+    const r = parseInt(hex.slice(1,3),16), g = parseInt(hex.slice(3,5),16), b = parseInt(hex.slice(5,7),16)
+    const root = document.documentElement
+    root.style.setProperty('--pink',       hex)
+    root.style.setProperty('--pink-hover', shadeColor(hex, 12))
+    root.style.setProperty('--pink-dim',   `rgba(${r},${g},${b},0.18)`)
+    root.style.setProperty('--pink-glow',  `rgba(${r},${g},${b},0.35)`)
+    root.style.setProperty('--pink-rgb',   `${r},${g},${b}`)
+    settings.accentColor = hex
+    api.saveSettings(settings)
+  })
+}
+
+function shadeColor(hex, pct) {
+  const n = parseInt(hex.replace('#',''),16)
+  const amt = Math.round(2.55 * pct)
+  const R = Math.min(255,(n>>16)+amt), G = Math.min(255,((n>>8)&0xFF)+amt), B = Math.min(255,(n&0xFF)+amt)
+  return '#' + ((1<<24)+(R<<16)+(G<<8)+B).toString(16).slice(1)
+}
+
+function resetAccentColor() {
+  const t = THEMES[settings.theme || 'jylli']
+  const picker = document.getElementById('accent-color-picker')
+  if (picker) picker.value = t.accent
+  applyTheme(settings.theme || 'jylli')
+  delete settings.accentColor
+  api.saveSettings(settings)
 }
 
 // ─── Debug Console ────────────────────────────────────────────────────────────
@@ -3928,6 +3588,9 @@ function buildScheduler(c) {
           <option value="flush-dns">${tUI('schedOptFlushDns')}</option>
           <option value="clean-nvidia">${tUI('schedOptNvidiaCache')}</option>
           <option value="defrag-c">${tUI('schedOptDefrag')}</option>
+          <option value="clean-ram">Free RAM (Empty Standby List)</option>
+          <option value="windows-update">Check Windows Updates</option>
+          <option value="clean-downloads">⚠ Clear Downloads Folder</option>
         </select>
       </div>
       <div>
@@ -3959,7 +3622,18 @@ function buildScheduler(c) {
 async function doScheduleTask() {
   const action = document.getElementById('sched-action').value
   const when = document.getElementById('sched-when').value
-  const labels = { 'clean-temp': 'ClearTemp', 'flush-dns': 'FlushDNS', 'clean-nvidia': 'ClearNvidiaCacheFiles', 'defrag-c': 'DefragC' }
+  const labels = {
+    'clean-temp':       'ClearTemp',
+    'flush-dns':        'FlushDNS',
+    'clean-nvidia':     'ClearNvidiaCacheFiles',
+    'defrag-c':         'DefragC',
+    'clean-ram':        'CleanRAM',
+    'windows-update':   'WindowsUpdate',
+    'clean-downloads':  'CleanDownloads',
+  }
+  if (action === 'clean-downloads') {
+    try { await showConfirm({ title: 'Clear Downloads Folder', body: 'This will permanently delete <strong>all files</strong> in your Downloads folder on schedule. Are you sure?', okText: 'Schedule Anyway', okStyle: 'danger', icon: 'fa-triangle-exclamation' }) } catch { return }
+  }
   const r = await api.scheduleTweak({ taskName: labels[action] || action, schedule: when, action })
   toast(r.ok ? 'Task scheduled!' : 'Schedule failed', r.ok ? `JT_${labels[action]} created` : r.error, r.ok ? 'ok' : 'err')
   if (r.ok) loadScheduledTasks()
@@ -4161,6 +3835,155 @@ function buildPreflight(c) {
   const resultsDiv = document.createElement('div')
   resultsDiv.id = 'pf-results'
   c.appendChild(resultsDiv)
+
+  // Driver Update Checker card
+  const driverCard = makeSection('<i class="fa fa-microchip"></i> Driver Update Checker', 'Scans installed GPU, network, and audio drivers and flags outdated ones.')
+  const driverBody = document.createElement('div')
+  driverBody.style.cssText = 'padding:12px 18px'
+  driverBody.innerHTML = `
+    <div style="display:flex;gap:8px;align-items:center;margin-bottom:10px">
+      <button class="btn btn-primary btn-sm" id="driver-scan-btn" onclick="doDriverScan()"><i class="fa fa-magnifying-glass"></i> Scan Drivers</button>
+      <span id="driver-status" style="font-size:10px;color:var(--muted)">Click Scan to check for outdated drivers</span>
+    </div>
+    <div id="driver-results"></div>`
+  driverCard.appendChild(driverBody)
+  c.appendChild(driverCard)
+
+  // Benchmark card
+  const benchCard = makeSection('<i class="fa fa-gauge-high"></i> CPU Benchmark', 'Run a 10-second CPU stress test. Compare scores before and after applying tweaks.')
+  const benchBody = document.createElement('div')
+  benchBody.style.cssText = 'padding:12px 18px'
+  benchBody.innerHTML = `
+    <div style="display:flex;gap:8px;align-items:center;margin-bottom:10px">
+      <button class="btn btn-primary btn-sm" id="bench-run-btn" onclick="doBenchmark()"><i class="fa fa-play"></i> Run Benchmark</button>
+      <span id="bench-status" style="font-size:10px;color:var(--muted)">~10 seconds</span>
+    </div>
+    <div id="bench-progress" style="display:none;margin-bottom:8px">
+      <div style="height:4px;background:var(--border);border-radius:2px;overflow:hidden">
+        <div id="bench-bar" style="height:100%;width:0%;background:var(--pink);transition:width 0.5s linear"></div>
+      </div>
+    </div>
+    <div id="bench-results"></div>`
+  benchCard.appendChild(benchBody)
+  c.appendChild(benchCard)
+}
+
+async function doDriverScan() {
+  const btn = document.getElementById('driver-scan-btn')
+  const status = document.getElementById('driver-status')
+  const results = document.getElementById('driver-results')
+  if (!btn) return
+  btn.disabled = true
+  btn.innerHTML = '<i class="fa fa-spinner fa-spin"></i> Scanning…'
+  status.textContent = 'Querying WMI driver database…'
+  results.innerHTML = ''
+
+  const r = await api.getDriverInfo()
+  btn.disabled = false
+  btn.innerHTML = '<i class="fa fa-magnifying-glass"></i> Scan Again'
+
+  if (!r.ok || !r.drivers?.length) {
+    status.textContent = r.error || 'No third-party drivers found'
+    return
+  }
+
+  const now = Date.now()
+  const driverLinks = {
+    nvidia:  'https://www.nvidia.com/drivers',
+    amd:     'https://www.amd.com/support',
+    intel:   'https://www.intel.com/content/www/us/en/download-center/home.html',
+    realtek: 'https://www.realtek.com/en/downloads',
+  }
+
+  const rows = r.drivers.map(d => {
+    // DriverDate comes as WMI date string like "20231015000000.000000+000" or a JS Date object
+    let driverMs = 0
+    if (d.DriverDate) {
+      const raw = typeof d.DriverDate === 'string' ? d.DriverDate : JSON.stringify(d.DriverDate)
+      const m = raw.match(/(\d{4})(\d{2})(\d{2})/)
+      if (m) driverMs = new Date(`${m[1]}-${m[2]}-${m[3]}`).getTime()
+    }
+    const ageDays = driverMs ? Math.floor((now - driverMs) / 86400000) : -1
+    const statusColor = ageDays < 0 ? 'var(--muted)' : ageDays > 365 ? 'var(--danger)' : ageDays > 180 ? 'var(--warning)' : 'var(--success)'
+    const statusText  = ageDays < 0 ? 'Unknown date' : ageDays > 365 ? 'Outdated' : ageDays > 180 ? 'Aging' : 'Up to date'
+    const mfr = (d.Manufacturer || '').toLowerCase()
+    const knownLink = Object.keys(driverLinks).find(k => mfr.includes(k))
+    const linkUrl = knownLink ? driverLinks[knownLink] : `https://www.google.com/search?q=${encodeURIComponent((d.Manufacturer||'')+' '+(d.DeviceName||'')+' driver download')}`
+    const dateStr = driverMs ? new Date(driverMs).toLocaleDateString() : '—'
+    return `<div style="display:grid;grid-template-columns:1fr auto auto auto;gap:8px;align-items:center;padding:5px 0;border-bottom:1px solid var(--border);font-size:11px">
+      <div><div style="color:var(--white);font-weight:600">${escHtml(d.DeviceName||'')}</div><div style="color:var(--muted);font-size:10px">${escHtml(d.Manufacturer||'')} · v${escHtml(d.DriverVersion||'?')}</div></div>
+      <div style="color:var(--muted)">${dateStr}</div>
+      <div style="color:${statusColor};font-weight:700;font-size:10px">${statusText}</div>
+      <button class="btn btn-ghost btn-sm" style="font-size:10px" onclick="api.openExternal('${linkUrl}')">Download</button>
+    </div>`
+  }).join('')
+
+  const outdated = r.drivers.filter(d => {
+    if (!d.DriverDate) return false
+    const raw = typeof d.DriverDate === 'string' ? d.DriverDate : JSON.stringify(d.DriverDate)
+    const m = raw.match(/(\d{4})(\d{2})(\d{2})/)
+    if (!m) return false
+    return (now - new Date(`${m[1]}-${m[2]}-${m[3]}`).getTime()) > 365 * 86400000
+  }).length
+
+  status.textContent = `${r.drivers.length} drivers found · ${outdated} outdated`
+  results.innerHTML = `<div style="border-top:1px solid var(--border)">${rows}</div>`
+}
+
+let benchmarkBaseline = null
+
+async function doBenchmark() {
+  const btn = document.getElementById('bench-run-btn')
+  const status = document.getElementById('bench-status')
+  const results = document.getElementById('bench-results')
+  const progress = document.getElementById('bench-progress')
+  const bar = document.getElementById('bench-bar')
+  if (!btn) return
+
+  btn.disabled = true
+  btn.innerHTML = '<i class="fa fa-spinner fa-spin"></i> Running…'
+  status.textContent = 'Running 10-second CPU benchmark…'
+  if (progress) progress.style.display = ''
+  if (bar) { bar.style.width = '0%'; setTimeout(() => { bar.style.transition = 'width 10s linear'; bar.style.width = '100%' }, 50) }
+
+  const r = await api.runBenchmark()
+
+  if (bar) { bar.style.transition = ''; bar.style.width = '100%' }
+  btn.disabled = false
+  btn.innerHTML = '<i class="fa fa-play"></i> Run Again'
+
+  if (!r.ok) {
+    status.textContent = 'Benchmark failed: ' + r.error
+    if (progress) progress.style.display = 'none'
+    return
+  }
+
+  if (benchmarkBaseline === null) {
+    benchmarkBaseline = r.score
+    status.textContent = `Baseline score: ${r.score.toLocaleString()} — Apply tweaks then run again to compare`
+    results.innerHTML = `<div style="padding:10px 0;font-size:13px;font-weight:800;color:var(--white)">Score: <span style="color:var(--pink)">${r.score.toLocaleString()}</span></div>
+      <div style="font-size:10px;color:var(--muted)">This is your baseline. Apply tweaks and run again to see improvement.</div>`
+  } else {
+    const delta = r.score - benchmarkBaseline
+    const pct = ((delta / benchmarkBaseline) * 100).toFixed(1)
+    const color = delta >= 0 ? 'var(--success)' : 'var(--danger)'
+    status.textContent = `Score: ${r.score.toLocaleString()} · ${delta >= 0 ? '+' : ''}${pct}% vs baseline`
+    results.innerHTML = `<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;padding:8px 0">
+      <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:8px;padding:10px;text-align:center">
+        <div style="font-size:10px;color:var(--muted);margin-bottom:4px">BASELINE</div>
+        <div style="font-size:16px;font-weight:800;color:var(--white)">${benchmarkBaseline.toLocaleString()}</div>
+      </div>
+      <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:8px;padding:10px;text-align:center">
+        <div style="font-size:10px;color:var(--muted);margin-bottom:4px">NOW</div>
+        <div style="font-size:16px;font-weight:800;color:var(--white)">${r.score.toLocaleString()}</div>
+      </div>
+      <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:8px;padding:10px;text-align:center">
+        <div style="font-size:10px;color:var(--muted);margin-bottom:4px">DELTA</div>
+        <div style="font-size:16px;font-weight:800;color:${color}">${delta >= 0 ? '+' : ''}${pct}%</div>
+      </div>
+    </div>
+    <button class="btn btn-ghost btn-sm" style="margin-top:4px;font-size:10px" onclick="benchmarkBaseline=null;document.getElementById('bench-results').innerHTML='';document.getElementById('bench-status').textContent='Baseline reset — run again to set new baseline'">Reset Baseline</button>`
+  }
 }
 
 async function runPreflightScan(btn) {
@@ -4478,21 +4301,42 @@ async function loadChangelogPage() {
     list.innerHTML = `<div style="padding:20px 18px;color:var(--muted);font-size:11px;text-align:center">${tUI('historyEmpty')}</div>`
     return
   }
-  list.innerHTML = entries.slice(0, 100).map(e => `
+  // Non-reversible actions (debloat, cleanup, one-way fixes)
+  const NON_REVERSIBLE = ['remove-uwp', 'debloat', 'remove-device', 'disable-service', 'disable-task', 'fix-', 'clean-', 'delete-']
+  const isReversible = (id) => !NON_REVERSIBLE.some(prefix => id.startsWith(prefix) || id.includes(prefix))
+
+  list.innerHTML = entries.slice(0, 100).map(e => {
+    const oppositeAction = e.action === 'apply' ? 'restore' : 'apply'
+    const undoLabel = e.action === 'apply' ? 'Undo' : 'Re-apply'
+    const showUndo = isReversible(e.id)
+    return `
     <div class="cl-entry">
       <div class="cl-dot ${e.action}"></div>
       <div class="cl-body">
         <div class="cl-title">${e.action === 'apply' ? `<i class="fa fa-check"></i> ${tUI('historyApplied')}` : `<i class="fa fa-rotate-left"></i> ${tUI('historyRestored')}`}: ${e.id}</div>
         <div class="cl-ts">${new Date(e.ts).toLocaleString()}</div>
       </div>
-    </div>
-  `).join('')
+      ${showUndo ? `<button class="btn btn-ghost btn-sm" style="font-size:10px;padding:2px 10px;flex-shrink:0" onclick="undoTweakEntry('${escHtml(e.id)}','${oppositeAction}')">${undoLabel}</button>` : ''}
+    </div>`
+  }).join('')
 }
 
 async function doClearChangelog() {
   try { await showConfirm({ title: 'Clear Tweak History', body: 'All recorded tweak history will be permanently deleted.', okText: 'Clear', okStyle: 'warning', icon: 'fa-trash' }) } catch { return }
   await api.clearChangelog()
   toast('History cleared', '', 'ok')
+  loadChangelogPage()
+}
+
+async function undoTweakEntry(tweakId, action) {
+  const r = await api.runTweak(tweakId, action)
+  if (r && r.ok === false) {
+    toast(`Failed: ${tweakId}`, r.error || '', 'err')
+    return
+  }
+  await api.addChangelogEntry({ id: tweakId, action }).catch(() => {})
+  const friendly = tweakId.replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase())
+  toast(action === 'restore' ? `Undone: ${friendly}` : `Re-applied: ${friendly}`, '', action === 'restore' ? 'info' : 'ok')
   loadChangelogPage()
 }
 
@@ -4596,6 +4440,614 @@ async function doGameScan(btn) {
 }
 
 // ─── Latency Monitor ─────────────────────────────────────────────────────────
+// ─── BIOS Tuner ───────────────────────────────────────────────────────────────
+
+// Curated SCEWIN settings: { key: Setup Question name (substring match), label, desc, danger, dangerLabel, warning, reboot }
+const BIOS_CURATED = [
+  { key:'XMP',              label:'XMP / DOCP / EXPO Memory Profile',   desc:'Enables your RAM\'s rated overclock speed. If your RAM is running below its rated MHz, enabling this is the single highest-impact free performance gain available.',             danger:false, warning:'',                                                                                                              reboot:true  },
+  { key:'DOCP',             label:'XMP / DOCP / EXPO Memory Profile',   desc:'Enables your RAM\'s rated overclock speed (AMD DOCP variant). If your RAM is running below its rated MHz, enabling this is the single highest-impact free performance gain.', danger:false, warning:'',                                                                                                              reboot:true  },
+  { key:'EXPO',             label:'XMP / DOCP / EXPO Memory Profile',   desc:'Enables your RAM\'s rated overclock speed (AMD EXPO variant for DDR5).',                                                                                                        danger:false, warning:'',                                                                                                              reboot:true  },
+  { key:'Resizable BAR',    label:'Resizable BAR (ReBAR)',               desc:'Allows the CPU to access the full GPU VRAM at once instead of in 256MB windows. Required for NVIDIA RTX 30+ and AMD RX 6000+ performance gains.',                              danger:false, warning:'Requires "Above 4G Decoding" to be enabled first. CSM must be disabled.',                                    reboot:true  },
+  { key:'Above 4G',         label:'Above 4G Decoding',                  desc:'Required for Resizable BAR. Allows PCIe devices to use memory addresses above 4GB. Must be enabled before enabling Resizable BAR.',                                            danger:true,  dangerLabel:'I understand — enables high memory decoding', warning:'Disabling this when ReBAR is on may cause instability.', reboot:true  },
+  { key:'C-State',          label:'CPU C-States',                        desc:'Controls how deep the CPU sleeps between tasks. Disabling reduces wake-up latency. Recommended: disabled for competitive gaming, enabled for everyday use.',                    danger:false, warning:'Disabling C-States increases idle power draw and CPU temperatures significantly.',                              reboot:true  },
+  { key:'Global C-state',   label:'CPU C-States (Global)',               desc:'AMD variant of C-State control. Disabling reduces CPU wake-up latency for competitive gaming.',                                                                                  danger:false, warning:'Disabling C-States increases idle power draw and CPU temperatures significantly.',                              reboot:true  },
+  { key:'Fast Boot',        label:'Fast Boot',                           desc:'Skips POST hardware checks for a faster boot. Safe for most systems. Disable temporarily if you need to access BIOS after enabling.',                                          danger:false, warning:'If Fast Boot is on and you need BIOS access, hold Shift while clicking Restart in Windows.',                 reboot:true  },
+  { key:'CSM',              label:'CSM (Compatibility Support Module)',  desc:'Legacy BIOS compatibility layer. Should be disabled on all modern systems. Disabling is required for Resizable BAR and may improve boot speed.',                               danger:true,  dangerLabel:'I understand — may cause no display if GPU is old', warning:'Old GPUs (pre-2012) that don\'t support UEFI GOP may show no display output if CSM is disabled.', reboot:true },
+  { key:'Secure Boot',      label:'Secure Boot',                         desc:'Verifies bootloader signatures. Required for Windows 11. Enabling this protects against bootkit malware. No performance impact.',                                              danger:false, warning:'',                                                                                                              reboot:true  },
+  { key:'Core Performance', label:'CPU Core Performance Boost (AMD)',    desc:'AMD\'s automatic CPU boost algorithm. Enabling allows the CPU to boost above base clock automatically. Disabling can reduce heat at the cost of single-core performance.',    danger:false, warning:'',                                                                                                              reboot:false },
+  { key:'Turbo Boost',      label:'Intel Turbo Boost',                   desc:'Intel\'s automatic CPU boost. Enabling allows the CPU to boost above base clock automatically.',                                                                               danger:false, warning:'',                                                                                                              reboot:false },
+  { key:'Power Supply Idle',label:'Power Supply Idle Control (AMD)',     desc:'Controls PSU idle state behaviour. "Typical Current Idle" reduces power draw at idle. "Low Current Idle" can cause instability with high-end GPUs.',                           danger:true,  dangerLabel:'I understand — wrong value can cause instability', warning:'Setting this incorrectly for your PSU can cause system crashes under load.',                      reboot:true  },
+]
+
+let _biosDumpPath = null
+let _biosXmpGap = false
+
+async function buildBiosTuner(c) {
+  // ── Permanent danger banner ───────────────────────────────────────────────
+  const banner = document.createElement('div')
+  banner.style.cssText = 'background:#1a0408;border:1.5px solid #c0152a;border-radius:10px;padding:14px 18px;margin-bottom:16px;display:flex;gap:12px;align-items:flex-start'
+  banner.innerHTML = `
+    <div style="color:#e74c3c;font-size:20px;flex-shrink:0;margin-top:1px"><i class="fa fa-triangle-exclamation"></i></div>
+    <div>
+      <div style="font-size:12px;font-weight:800;color:#e74c3c;letter-spacing:0.5px;margin-bottom:4px">BIOS TUNER — HIGH RISK TOOL</div>
+      <div style="font-size:11px;color:#c0c0c0;line-height:1.6">
+        Writing incorrect values to your BIOS can cause your system to <strong>fail to boot</strong>. Only change settings you understand.<br>
+        All SCEWIN changes take effect <strong>immediately</strong> without a reboot (unless marked otherwise).<br>
+        If your system becomes unstable after a change, enter your BIOS and select <strong>"Load Optimized Defaults"</strong>.<br>
+        <span id="bios-compat-note" style="color:#aaa">SCEWIN works on <strong>AMI BIOS only</strong> (ASUS, MSI, Gigabyte, ASRock). Other boards will be read-only or unsupported.</span>
+      </div>
+    </div>`
+  c.appendChild(banner)
+
+  // ── Recovery Guide ─────────────────────────────────────────────────────────
+  const recoveryGuide = document.createElement('div')
+  recoveryGuide.style.cssText = 'background:#081414;border:1.5px solid #1a6060;border-radius:10px;padding:0;margin-bottom:16px;overflow:hidden'
+  recoveryGuide.innerHTML = `
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 16px;cursor:pointer;user-select:none" onclick="this.parentElement.querySelector('.recovery-body').style.display = this.parentElement.querySelector('.recovery-body').style.display==='none' ? '' : 'none'; this.querySelector('.recovery-chevron').style.transform = this.parentElement.querySelector('.recovery-body').style.display==='' ? 'rotate(180deg)' : ''">
+      <div style="display:flex;align-items:center;gap:10px">
+        <i class="fa fa-life-ring" style="color:#3ab8b8;font-size:15px"></i>
+        <span style="font-size:12px;font-weight:700;color:#3ab8b8;letter-spacing:0.3px">What to do if something goes wrong</span>
+      </div>
+      <i class="fa fa-chevron-down recovery-chevron" style="color:#3ab8b8;font-size:11px;transition:transform 0.2s"></i>
+    </div>
+    <div class="recovery-body" style="display:none;padding:0 16px 14px;border-top:1px solid #1a4040">
+      <div style="display:grid;gap:10px;margin-top:12px">
+        <div style="background:#0a1f1f;border-radius:7px;padding:10px 14px">
+          <div style="font-size:11px;font-weight:700;color:#3ab8b8;margin-bottom:5px"><i class="fa fa-power-off"></i> System won't boot after a BIOS change</div>
+          <ol style="margin:0;padding-left:16px;font-size:10.5px;color:#b0c8c8;line-height:1.8">
+            <li>Power off completely — hold the power button for 5 seconds</li>
+            <li>Press <strong style="color:#e0e0e0">DEL / F2 / F12</strong> (varies by board) on the very next boot to enter BIOS</li>
+            <li>Find <strong style="color:#e0e0e0">"Load Optimized Defaults"</strong> or <strong style="color:#e0e0e0">"Restore Defaults"</strong> — usually the F5 key</li>
+            <li>Save and exit — this resets ALL BIOS settings to safe factory values</li>
+          </ol>
+        </div>
+        <div style="background:#0a1f1f;border-radius:7px;padding:10px 14px">
+          <div style="font-size:11px;font-weight:700;color:#3ab8b8;margin-bottom:5px"><i class="fa fa-display"></i> Screen goes black after disabling CSM</div>
+          <div style="font-size:10.5px;color:#b0c8c8;line-height:1.8">Your GPU may not support UEFI GOP output. Re-enable CSM in BIOS. If you can't see the BIOS screen at all, connect your monitor to a different GPU or use integrated graphics temporarily.</div>
+        </div>
+        <div style="background:#0a1f1f;border-radius:7px;padding:10px 14px">
+          <div style="font-size:11px;font-weight:700;color:#3ab8b8;margin-bottom:5px"><i class="fa fa-memory"></i> System unstable / crashes after enabling XMP</div>
+          <div style="font-size:10.5px;color:#b0c8c8;line-height:1.8">Enter BIOS → disable XMP/DOCP → boot at stock speed. Run <strong style="color:#e0e0e0">Windows Memory Diagnostic</strong> (search in Start) or MemTest86 overnight to verify RAM stability. Some RAM needs a looser XMP profile.</div>
+        </div>
+        <div style="background:#0a1f1f;border-radius:7px;padding:10px 14px">
+          <div style="font-size:11px;font-weight:700;color:#3ab8b8;margin-bottom:5px"><i class="fa fa-brands fa-windows"></i> Hyper-V change broke WSL2 / Docker</div>
+          <div style="font-size:10.5px;color:#b0c8c8;line-height:1.8">Go to <strong style="color:#e0e0e0">OS-Level BIOS Controls → Hyper-V → Restore</strong>, then reboot. WSL2 and Docker will return to normal.</div>
+        </div>
+        <div style="background:#0a1f1f;border-radius:7px;padding:10px 14px">
+          <div style="font-size:11px;font-weight:700;color:#3ab8b8;margin-bottom:5px"><i class="fa fa-microchip"></i> SCEWIN write failed or BIOS setting reverted</div>
+          <div style="font-size:10.5px;color:#b0c8c8;line-height:1.8">The app automatically backed up your BIOS dump before every write. If a write fails, it is restored automatically. Some settings require a specific combination (e.g. Above 4G Decoding must be enabled before enabling ReBAR). If problems persist, use <strong style="color:#e0e0e0">Load Optimized Defaults</strong> in your BIOS.</div>
+        </div>
+      </div>
+    </div>`
+  c.appendChild(recoveryGuide)
+
+  // ── Section A: BIOS Info Scan ─────────────────────────────────────────────
+  const infoCard = makeSection('<i class="fa fa-stethoscope"></i> BIOS System Scan', 'Reads BIOS version, memory speed, Hyper-V state, and security features from Windows.')
+  const scanRow = document.createElement('div')
+  scanRow.style.cssText = 'padding:10px 18px 14px'
+  scanRow.innerHTML = `
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px">
+      <button class="btn btn-primary btn-sm" id="bios-scan-btn" onclick="doBiosScan()"><i class="fa fa-magnifying-glass"></i> Scan System</button>
+      <span id="bios-scan-status" style="font-size:11px;color:var(--gray)">Click Scan to read BIOS info.</span>
+    </div>
+    <div id="bios-info-results" style="display:none"></div>`
+  infoCard.appendChild(scanRow)
+  c.appendChild(infoCard)
+
+  // ── Section B: OS-Level Controls ─────────────────────────────────────────
+  const osCard = makeSection('<i class="fa fa-sliders"></i> OS-Level BIOS Controls', 'These settings mirror BIOS options but are controlled from Windows. No SCEWIN required.')
+
+  // Hyper-V row
+  const hvDiv = document.createElement('div')
+  hvDiv.className = 'tweak-row has-warning'
+  hvDiv.innerHTML = `
+    <div class="spec-warning"><span><i class="fa fa-triangle-exclamation"></i></span>Disabling Hyper-V breaks WSL2, Docker Desktop, and Android emulators. Restore before using these tools.</div>
+    <div class="tweak-info">
+      <div class="tweak-name">Disable Hyper-V (Windows Hypervisor Platform)</div>
+      <div class="tweak-desc">Disables the Windows Hypervisor. Hyper-V causes game scheduler overhead and interrupt latency — same root cause as HPET issues. Reboot required to take effect.</div>
+    </div>
+    <div class="tweak-right">
+      <span class="tweak-badge ${settings['bios-hyper-v'] === 'applied' ? 'applied' : ''}" id="badge-bios-hyper-v">${settings['bios-hyper-v'] === 'applied' ? '<i class="fa fa-check"></i> APPLIED' : 'DEFAULT'}</span>
+      <label class="danger-toggle"><span><i class="fa fa-triangle-exclamation"></i> I understand — reboot required</span><label class="toggle-switch"><input type="checkbox" id="tog-bios-hyper-v"><span class="toggle-slider"></span></label></label>
+      <button class="btn btn-primary btn-sm" onclick="doBiosOsControl('bios-hyper-v','apply')">Apply</button>
+      <button class="btn btn-ghost btn-sm" onclick="doBiosOsControl('bios-hyper-v','restore')">Restore</button>
+    </div>
+    <div class="tweak-progress" id="prog-bios-hyper-v"><div class="tweak-progress-bar" id="prog-bar-bios-hyper-v"></div></div>`
+  osCard.appendChild(hvDiv)
+
+  // C-States OS row
+  const csDiv = document.createElement('div')
+  const csLaptopWarn = sysInfo?.isLaptop ? 'Not recommended on laptops — significantly increases battery drain and heat.' : ''
+  csDiv.className = 'tweak-row' + (csLaptopWarn ? ' has-warning' : '')
+  csDiv.innerHTML = `
+    ${csLaptopWarn ? `<div class="spec-warning"><span><i class="fa fa-triangle-exclamation"></i></span>${csLaptopWarn}</div>` : ''}
+    <div class="tweak-info">
+      <div class="tweak-name">Disable CPU C-States (OS-level)</div>
+      <div class="tweak-desc">Forces the CPU to stay in C0/C1 (active state) via powercfg. Eliminates wake-from-idle latency spikes. For the full effect, also disable C-States in your BIOS settings below.</div>
+    </div>
+    <div class="tweak-right">
+      <span class="tweak-badge ${settings['bios-cstates'] === 'applied' ? 'applied' : ''}" id="badge-bios-cstates">${settings['bios-cstates'] === 'applied' ? '<i class="fa fa-check"></i> APPLIED' : 'DEFAULT'}</span>
+      <button class="btn btn-primary btn-sm" onclick="doBiosOsControl('bios-cstates','apply')">Apply</button>
+      <button class="btn btn-ghost btn-sm" onclick="doBiosOsControl('bios-cstates','restore')">Restore</button>
+    </div>
+    <div class="tweak-progress" id="prog-bios-cstates"><div class="tweak-progress-bar" id="prog-bar-bios-cstates"></div></div>`
+  osCard.appendChild(csDiv)
+  c.appendChild(osCard)
+
+  // ── Section C: SCEWIN Live BIOS Settings ─────────────────────────────────
+  const sceCard = makeSection('<i class="fa fa-microchip"></i> Live BIOS Settings (via SCEWIN)', 'Reads and writes BIOS settings directly from Windows. Requires SCEWIN_64.exe bundled in the app.')
+  const sceScanRow = document.createElement('div')
+  sceScanRow.style.cssText = 'padding:10px 18px 4px'
+  sceScanRow.innerHTML = `
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
+      <button class="btn btn-primary btn-sm" id="scewin-scan-btn" onclick="doBiosScewinScan()"><i class="fa fa-bolt"></i> Scan BIOS</button>
+      <button class="btn btn-ghost btn-sm" id="scewin-export-btn" onclick="doBiosDumpExport()" style="display:none"><i class="fa fa-file-export"></i> Export Dump</button>
+      <span id="scewin-scan-status" style="font-size:11px;color:var(--gray)">Click to read live BIOS settings.</span>
+    </div>`
+  sceCard.appendChild(sceScanRow)
+  const sceResults = document.createElement('div')
+  sceResults.id = 'scewin-results'
+  sceCard.appendChild(sceResults)
+  sceCard.id = 'bios-scewin-section'
+  c.appendChild(sceCard)
+
+  // ── Section D: RAM Diagnostics ────────────────────────────────────────────
+  const ramCard = makeSection('<i class="fa fa-memory"></i> RAM Diagnostics', 'Reads per-slot memory info from Windows. Timings cannot be written from Windows — use BIOS XMP/DOCP.')
+  const ramScanRow = document.createElement('div')
+  ramScanRow.style.cssText = 'padding:10px 18px 4px'
+  ramScanRow.innerHTML = `
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
+      <button class="btn btn-primary btn-sm" id="ram-scan-btn" onclick="doRamDiagScan()"><i class="fa fa-memory"></i> Scan RAM</button>
+      <span id="ram-scan-status" style="font-size:11px;color:var(--gray)">Click to read per-slot RAM info.</span>
+    </div>
+    <div style="background:#0a1414;border:1px solid #1a4040;border-radius:7px;padding:9px 13px;font-size:10.5px;color:#7ab8b8;margin-bottom:10px">
+      <i class="fa fa-circle-info"></i> <strong>RAM timings (CAS, tRCD, tRP, tRAS) cannot be changed from Windows.</strong>
+      They are stored in BIOS only. Use <strong>XMP / DOCP / EXPO</strong> in your BIOS settings above for optimal speed profiles.
+    </div>`
+  ramCard.appendChild(ramScanRow)
+  const ramResults = document.createElement('div')
+  ramResults.id = 'ram-diag-results'
+  ramCard.appendChild(ramResults)
+  c.appendChild(ramCard)
+
+  // ── Section E: CPU Power Tuner ────────────────────────────────────────────
+  const cpuCard = makeSection('<i class="fa fa-gauge-high"></i> CPU Power Tuner', 'Adjust CPU power limits (PPT/TDC/EDC) temporarily. AMD Ryzen only. Changes reset on reboot.')
+
+  const isAmd = (sysInfo?.cpu || '').toLowerCase().includes('amd') || (sysInfo?.cpu || '').toLowerCase().includes('ryzen')
+
+  const cpuContent = document.createElement('div')
+  cpuContent.style.cssText = 'padding:10px 18px 14px'
+
+  if (!isAmd) {
+    cpuContent.innerHTML = `
+      <div style="display:flex;align-items:center;gap:10px;padding:10px 14px;background:#111;border-radius:8px;font-size:11px;color:var(--gray)">
+        <i class="fa fa-circle-info" style="color:#3498db;font-size:15px"></i>
+        <div><strong style="color:var(--white)">Intel CPU detected.</strong> CPU power tuning from Windows requires Intel XTU (third-party install, K-series only). This tool supports AMD Ryzen only.
+        <br><span style="font-size:10px">Your CPU: ${sysInfo?.cpu || 'Unknown'}</span></div>
+      </div>`
+  } else {
+    cpuContent.innerHTML = `
+      <div style="background:#1a0d00;border:1.5px solid #c07000;border-radius:9px;padding:11px 15px;margin-bottom:14px;font-size:11px;color:#d4a040;display:flex;gap:10px;align-items:flex-start">
+        <i class="fa fa-triangle-exclamation" style="font-size:16px;flex-shrink:0;margin-top:1px"></i>
+        <div>
+          <div style="font-weight:800;font-size:11.5px;margin-bottom:4px">AMD CPU POWER TUNER — ADVANCED USERS ONLY</div>
+          <div style="line-height:1.7;color:#c8a060">
+            Changes PPT, TDC, and EDC power limits via RyzenAdj. <strong style="color:#e0c080">All changes reset on reboot — nothing is permanent.</strong><br>
+            Raising limits above stock can cause crashes or shutdown if your motherboard power delivery can't keep up.<br>
+            Lowering limits (Eco Mode) reduces heat and power draw — always safe. <strong>Never touch voltage — this tool doesn't expose it.</strong><br>
+            Requires <code style="font-size:9px">ryzenadj.exe</code> placed in <code style="font-size:9px">assets\ryzenadj\</code> inside the app folder.
+          </div>
+        </div>
+      </div>
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;flex-wrap:wrap">
+        <button class="btn btn-ghost btn-sm" id="ryzen-read-btn" onclick="doRyzenAdjRead()"><i class="fa fa-rotate"></i> Read Current Limits</button>
+        <span id="ryzen-read-status" style="font-size:10px;color:var(--gray)"></span>
+      </div>
+      <div style="display:grid;gap:10px;margin-bottom:14px">
+        <div style="display:flex;align-items:center;gap:12px">
+          <div style="width:180px;flex-shrink:0">
+            <div style="font-size:11px;font-weight:700;color:var(--white)">PPT — Package Power</div>
+            <div style="font-size:10px;color:var(--gray)">Total chip power cap. Eco ≈45W, Desktop ≈88–142W</div>
+          </div>
+          <input type="range" id="ryzen-ppt" min="20" max="230" value="88" oninput="document.getElementById('ryzen-ppt-val').textContent=this.value+'W'" style="flex:1;accent-color:var(--pink)">
+          <span id="ryzen-ppt-val" style="width:44px;text-align:right;font-size:12px;font-weight:700;color:var(--white)">88W</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:12px">
+          <div style="width:180px;flex-shrink:0">
+            <div style="font-size:11px;font-weight:700;color:var(--white)">TDC — Thermal Current</div>
+            <div style="font-size:10px;color:var(--gray)">Sustained current limit. Eco ≈35A, Desktop ≈75–110A</div>
+          </div>
+          <input type="range" id="ryzen-tdc" min="20" max="160" value="75" oninput="document.getElementById('ryzen-tdc-val').textContent=this.value+'A'" style="flex:1;accent-color:var(--pink)">
+          <span id="ryzen-tdc-val" style="width:44px;text-align:right;font-size:12px;font-weight:700;color:var(--white)">75A</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:12px">
+          <div style="width:180px;flex-shrink:0">
+            <div style="font-size:11px;font-weight:700;color:var(--white)">EDC — Peak Current</div>
+            <div style="font-size:10px;color:var(--gray)">Peak burst current. Eco ≈50A, Desktop ≈120–160A</div>
+          </div>
+          <input type="range" id="ryzen-edc" min="30" max="220" value="120" oninput="document.getElementById('ryzen-edc-val').textContent=this.value+'A'" style="flex:1;accent-color:var(--pink)">
+          <span id="ryzen-edc-val" style="width:44px;text-align:right;font-size:12px;font-weight:700;color:var(--white)">120A</span>
+        </div>
+      </div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px">
+        <span style="font-size:10px;color:var(--gray);align-self:center;margin-right:4px">Presets:</span>
+        <button class="btn btn-ghost btn-sm" onclick="ryzenPreset(45,35,50)" style="font-size:10px;padding:3px 10px">Eco Mode</button>
+        <button class="btn btn-ghost btn-sm" onclick="ryzenPreset(88,75,120)" style="font-size:10px;padding:3px 10px">Balanced</button>
+        <button class="btn btn-ghost btn-sm" onclick="ryzenPreset(142,110,160)" style="font-size:10px;padding:3px 10px">Performance</button>
+      </div>
+      <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+        <label class="danger-toggle" style="margin:0"><span><i class="fa fa-triangle-exclamation"></i> I understand — changes reset on reboot</span><label class="toggle-switch"><input type="checkbox" id="tog-ryzenadj"><span class="toggle-slider"></span></label></label>
+        <button class="btn btn-primary btn-sm" onclick="doRyzenAdjApply()"><i class="fa fa-bolt"></i> Apply</button>
+        <span id="ryzen-apply-status" style="font-size:10px;color:var(--gray)"></span>
+      </div>`
+  }
+  cpuCard.appendChild(cpuContent)
+  c.appendChild(cpuCard)
+
+  // ── Section F: Fan Control ─────────────────────────────────────────────────
+  const fanCard = makeSection('<i class="fa fa-fan"></i> Fan Control', 'Control system fan speeds using FanControl (bundled). Open the UI to configure fan curves, or run silently in the background.')
+  const fanContent = document.createElement('div')
+  fanContent.style.padding = '10px 18px 14px'
+  fanContent.innerHTML = `
+    <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:10px">
+      <button class="btn btn-primary btn-sm" onclick="doFanControlOpen()"><i class="fa fa-up-right-from-square"></i> Open FanControl UI</button>
+      <button class="btn btn-ghost btn-sm" onclick="doFanControlBackground()"><i class="fa fa-fan"></i> Run in Background</button>
+      <button class="btn btn-danger btn-sm" onclick="doFanControlStop()"><i class="fa fa-stop"></i> Stop</button>
+      <span id="fancontrol-status" style="font-size:11px;color:var(--gray)">Checking…</span>
+    </div>
+    <div style="font-size:11px;color:var(--gray)">Fan curves and sensor configuration are set inside the FanControl UI. Changes persist across reboots via FanControl's own profile system.</div>`
+  fanCard.appendChild(fanContent)
+  c.appendChild(fanCard)
+  ;(async () => {
+    const s = await api.fancontrolStatus()
+    const el = document.getElementById('fancontrol-status')
+    if (el) { el.textContent = s.running ? '● Running' : '○ Not running'; el.style.color = s.running ? '#2ecc71' : 'var(--gray)' }
+  })()
+}
+
+async function doFanControlOpen() {
+  const r = await api.fancontrolStart(false)
+  if (!r.ok) toast('FanControl not found', 'Place FanControl files in assets\\fancontrol\\', 'error')
+  else setTimeout(async () => {
+    const s = await api.fancontrolStatus()
+    const el = document.getElementById('fancontrol-status')
+    if (el) { el.textContent = s.running ? '● Running' : '○ Not running'; el.style.color = s.running ? '#2ecc71' : 'var(--gray)' }
+  }, 1500)
+}
+async function doFanControlBackground() {
+  const r = await api.fancontrolStart(true)
+  if (!r.ok) toast('FanControl not found', 'Place FanControl files in assets\\fancontrol\\', 'error')
+  else toast('FanControl running in background', '', 'ok')
+}
+async function doFanControlStop() {
+  await api.fancontrolStop()
+  toast('FanControl stopped', '', 'info')
+  const el = document.getElementById('fancontrol-status')
+  if (el) { el.textContent = '○ Not running'; el.style.color = 'var(--gray)' }
+}
+
+async function doBiosScan() {
+  const btn = document.getElementById('bios-scan-btn')
+  const status = document.getElementById('bios-scan-status')
+  const results = document.getElementById('bios-info-results')
+  btn.disabled = true
+  btn.innerHTML = '<i class="fa fa-spinner fa-spin"></i> Scanning…'
+  status.textContent = 'Reading BIOS info from Windows…'
+  const info = await api.getBiosInfo()
+  btn.disabled = false
+  btn.innerHTML = '<i class="fa fa-magnifying-glass"></i> Scan System'
+  if (!info.ok) { status.textContent = 'Scan failed.'; return }
+  status.textContent = 'Scan complete.'
+  const xmpGap = info.ramRated > 0 && info.ramActual > 0 && info.ramActual < info.ramRated * 0.95
+  _biosXmpGap = xmpGap
+  const xmpBanner = xmpGap ? `<div style="background:#1a1200;border:1px solid #b87800;border-radius:8px;padding:10px 14px;margin-bottom:10px;font-size:11px;color:#f0c060;display:flex;gap:8px;align-items:center"><i class="fa fa-triangle-exclamation"></i><div><strong>XMP / DOCP not enabled.</strong> Your RAM is running at ${info.ramActual} MHz but is rated for ${info.ramRated} MHz. Enable XMP in BIOS for a free performance gain.</div></div>` : ''
+  const row = (icon, label, value, good) => `
+    <div style="display:flex;align-items:center;gap:10px;padding:6px 0;border-bottom:1px solid var(--border2)">
+      <div style="width:26px;text-align:center;color:${good === true ? '#2ecc71' : good === false ? '#e74c3c' : '#f39c12'};font-size:13px"><i class="fa ${icon}"></i></div>
+      <div style="font-size:11px;color:var(--gray);width:160px;flex-shrink:0">${label}</div>
+      <div style="font-size:11px;color:var(--white);font-weight:600">${value}</div>
+    </div>`
+  const ramLabel = info.ramActual ? `${info.ramActual} MHz actual / ${info.ramRated} MHz rated${info.ramNote ? ' (' + info.ramNote + ')' : ''}` : 'Unknown'
+  results.style.display = ''
+  results.innerHTML = xmpBanner + `
+    <div style="padding:0 0 8px">
+      ${row('fa-server',        'Board',        info.board || 'Unknown', null)}
+      ${row('fa-code-branch',   'BIOS Version', `${info.biosVersion || '?'} (${info.biosDate || '?'})`, null)}
+      ${row('fa-building',      'BIOS Vendor',  info.biosMfr || 'Unknown', null)}
+      ${row('fa-shield-halved', 'UEFI Mode',    info.uefi ? 'UEFI' : info.uefi === false ? 'Legacy BIOS' : 'Unknown', info.uefi === true ? true : null)}
+      ${row('fa-lock',          'Secure Boot',  info.secureBoot ? 'Enabled' : 'Disabled', info.secureBoot)}
+      ${row('fa-fingerprint',   'TPM',          info.tpmPresent ? `Present (v${info.tpmVersion || '?'})` : 'Not detected', info.tpmPresent)}
+      ${row('fa-cpu',           'Virtualization', info.virt ? 'Enabled in BIOS' : 'Disabled in BIOS', info.virt)}
+      ${row('fa-memory',        'RAM Speed',    ramLabel, !xmpGap)}
+      ${row('fa-layer-group',   'Hyper-V',      info.hyperV ? 'Active (impacts game scheduler)' : 'Off', !info.hyperV)}
+      ${info.chipset ? row('fa-microchip', 'Chipset', info.chipset, null) : ''}
+    </div>`
+
+  // Update SCEWIN compat note based on detected BIOS vendor
+  const compatNote = document.getElementById('bios-compat-note')
+  if (compatNote) {
+    if (info.biosType === 'ami')
+      compatNote.innerHTML = '<span style="color:#2ecc71"><i class="fa fa-check"></i> AMI BIOS detected — SCEWIN full read/write supported.</span>'
+    else if (info.biosType === 'phoenix')
+      compatNote.innerHTML = '<span style="color:#e67e22">Phoenix BIOS detected — SCEWIN not supported. BIOS info scan above is read-only.</span>'
+    else if (info.biosType === 'insyde')
+      compatNote.innerHTML = '<span style="color:#e67e22">Insyde BIOS detected — SCEWIN not supported. BIOS info scan above is read-only.</span>'
+    else if (info.biosType === 'award')
+      compatNote.innerHTML = '<span style="color:#e67e22">Award BIOS detected — SCEWIN not supported. BIOS info scan above is read-only.</span>'
+    else
+      compatNote.innerHTML = '<span style="color:#aaa">SCEWIN works on <strong>AMI BIOS only</strong> (ASUS, MSI, Gigabyte, ASRock). Other boards will be read-only or unsupported.</span>'
+  }
+
+  // Block SCEWIN section for confirmed non-AMI boards
+  if (info.biosType && info.biosType !== 'ami' && info.biosType !== 'unknown') {
+    const sceSection = document.getElementById('bios-scewin-section')
+    if (sceSection) sceSection.innerHTML = `<div style="padding:12px;background:#1a0e00;border:1px solid #7a4400;border-radius:8px;font-size:12px;color:#e67e22">
+      <i class="fa fa-circle-info"></i> <strong>${info.biosType.charAt(0).toUpperCase() + info.biosType.slice(1)} BIOS detected</strong> — SCEWIN is only compatible with AMI BIOS (ASUS, MSI, Gigabyte, ASRock).
+      The system scan above is still available. Live BIOS read/write via SCEWIN is not supported on this board.
+    </div>`
+  }
+
+  // Recommendations card
+  const recs = []
+  const cpuLower = (sysInfo?.cpu || '').toLowerCase()
+  const chipsetLower = (info.chipset || '').toLowerCase()
+  const hasModernPcie = /x570|b550|x670|b650|z490|z590|z690|z790|b760|h670|b760/i.test(chipsetLower)
+  if (info.ramActual > 0 && info.ramRated > 0 && info.ramActual < info.ramRated * 0.95)
+    recs.push({ icon: 'fa-bolt', color: '#f39c12', text: `Enable XMP / DOCP / EXPO — RAM running at ${info.ramActual} MHz but rated for ${info.ramRated} MHz` })
+  else if (info.ramActual > 0)
+    recs.push({ icon: 'fa-check', color: '#2ecc71', text: `RAM running at rated speed (${info.ramActual} MHz)` })
+  if (hasModernPcie)
+    recs.push({ icon: 'fa-bolt', color: '#f39c12', text: 'Enable Resizable BAR + Above 4G Decoding — your chipset supports it and it improves GPU performance' })
+  if (!info.uefi)
+    recs.push({ icon: 'fa-triangle-exclamation', color: '#e74c3c', text: 'Legacy BIOS mode detected — consider enabling UEFI mode for better compatibility and security' })
+  if (info.uefi && !info.secureBoot)
+    recs.push({ icon: 'fa-circle-info', color: '#3498db', text: 'Secure Boot is off — enabling it improves boot security with no performance cost' })
+  if (!info.tpmPresent)
+    recs.push({ icon: 'fa-triangle-exclamation', color: '#e74c3c', text: 'No TPM detected — Windows 11 requires TPM 2.0. Enable fTPM (AMD) or PTT (Intel) in BIOS' })
+  if (info.hyperV)
+    recs.push({ icon: 'fa-circle-info', color: '#9b59b6', text: 'Hyper-V is active — disabling it reduces CPU virtualization overhead for gaming if you don\'t use WSL2/Docker/VMs' })
+  if (sysInfo?.isLaptop)
+    recs.push({ icon: 'fa-triangle-exclamation', color: '#e67e22', text: 'Laptop detected — do NOT disable C-States (severe battery drain and heat risk)' })
+  else
+    recs.push({ icon: 'fa-circle-info', color: '#3498db', text: 'Desktop detected — disabling C-States in BIOS can reduce CPU wake-up latency for competitive gaming' })
+  if (cpuLower.includes('amd') || cpuLower.includes('ryzen'))
+    recs.push({ icon: 'fa-check', color: '#2ecc71', text: 'AMD CPU — ensure Core Performance Boost is enabled in BIOS for automatic boost clocks' })
+  else if (cpuLower.includes('intel'))
+    recs.push({ icon: 'fa-check', color: '#2ecc71', text: 'Intel CPU — ensure Turbo Boost is enabled in BIOS for automatic boost clocks' })
+
+  if (recs.length) {
+    const recDiv = document.createElement('div')
+    recDiv.style.cssText = 'margin-top:14px;background:#0a1a0a;border:1px solid #1e3a1e;border-radius:8px;padding:12px 14px'
+    recDiv.innerHTML = `<div style="font-size:11px;font-weight:700;color:#2ecc71;margin-bottom:8px;letter-spacing:0.5px"><i class="fa fa-wand-magic-sparkles"></i> RECOMMENDED FOR YOUR SYSTEM</div>` +
+      recs.map(r => `<div style="display:flex;gap:8px;align-items:flex-start;padding:4px 0;font-size:11px;color:var(--gray)"><i class="fa ${r.icon}" style="color:${r.color};margin-top:1px;width:14px;flex-shrink:0"></i><span>${r.text}</span></div>`).join('')
+    results.appendChild(recDiv)
+  }
+}
+
+async function doBiosOsControl(id, action) {
+  const badge = document.getElementById(`badge-${id}`)
+  const bar   = document.getElementById(`prog-bar-${id}`)
+  const prog  = document.getElementById(`prog-${id}`)
+  if (id === 'bios-hyper-v' && action === 'apply') {
+    const tog = document.getElementById('tog-bios-hyper-v')
+    if (!tog?.checked) { toast('Safety Toggle Required', 'Flip the safety toggle before applying.', 'warn'); return }
+  }
+  if (bar) { bar.style.width = '0%'; bar.style.display = 'block'; bar.classList.add('indeterminate') }
+  if (badge) badge.innerHTML = '<i class="fa fa-spinner fa-spin"></i>'
+  let r
+  if (id === 'bios-hyper-v') r = await api.biosHyperV(action)
+  else r = await api.biosCStates(action)
+  if (bar) { bar.classList.remove('indeterminate'); bar.style.display = 'none' }
+  if (r.ok) {
+    const applied = action === 'apply'
+    if (badge) { badge.innerHTML = applied ? '<i class="fa fa-check"></i> APPLIED' : 'DEFAULT'; badge.className = 'tweak-badge' + (applied ? ' applied' : '') }
+    settings[id] = applied ? 'applied' : 'not-applied'
+    await api.saveSettings(settings)
+    if (id === 'bios-hyper-v') toast('Hyper-V ' + (applied ? 'Disabled' : 'Re-enabled'), 'Reboot required for this change to take effect.', 'info')
+  } else {
+    if (badge) { badge.innerHTML = '<i class="fa fa-xmark"></i> ERROR'; badge.className = 'tweak-badge' }
+    toast('Failed', r.error || 'Operation failed.', 'error')
+  }
+}
+
+async function doBiosScewinScan() {
+  const btn    = document.getElementById('scewin-scan-btn')
+  const status = document.getElementById('scewin-scan-status')
+  const out    = document.getElementById('scewin-results')
+  btn.disabled = true
+  btn.innerHTML = '<i class="fa fa-spinner fa-spin"></i> Reading BIOS…'
+  status.textContent = 'Running SCEWIN dump…'
+  out.innerHTML = ''
+  const r = await api.biosScewinRead()
+  btn.disabled = false
+  btn.innerHTML = '<i class="fa fa-bolt"></i> Scan BIOS'
+  if (!r.ok) {
+    if (r.error === 'not_found') {
+      out.innerHTML = `<div style="padding:12px 18px 14px;font-size:11px;color:var(--gray)">
+        <i class="fa fa-circle-info" style="color:#3498db"></i>
+        <strong style="color:var(--white)"> SCEWIN not bundled.</strong>
+        Download <code>SCEWIN_64.exe</code> and place it in <code>[app install folder]\\assets\\scewin\\SCEWIN_64.exe</code> to enable live BIOS editing.
+        SCEWIN is available from AMI / ASUS forums. Only use official sources.
+      </div>`
+    } else {
+      out.innerHTML = `<div style="padding:12px 18px;font-size:11px;color:#f39c12"><i class="fa fa-triangle-exclamation"></i> ${r.error === 'not_supported' ? 'Your board does not support SCEWIN (requires AMI BIOS). BIOS info scan above is still available.' : r.error}</div>`
+    }
+    status.textContent = 'Could not read BIOS settings.'
+    return
+  }
+  _biosDumpPath = r.dumpPath
+  const exportBtn = document.getElementById('scewin-export-btn')
+  if (exportBtn) exportBtn.style.display = ''
+  status.textContent = `${r.entries.length} settings found. Showing known settings below.`
+  // Filter to curated list only — match by substring of Setup Question name
+  const matched = []
+  for (const def of BIOS_CURATED) {
+    const entry = r.entries.find(e => e.name.toLowerCase().includes(def.key.toLowerCase()))
+    if (entry && !matched.find(m => m.entry.token === entry.token)) matched.push({ def, entry })
+  }
+  if (!matched.length) {
+    out.innerHTML = `<div style="padding:12px 18px;font-size:11px;color:var(--gray)">No known settings found in this BIOS dump. Your board may use different setting names.</div>`
+    return
+  }
+  for (const { def, entry } of matched) {
+    out.appendChild(buildScewinSettingCard(def, entry))
+  }
+}
+
+function buildScewinSettingCard(def, entry) {
+  const isXmp = /xmp|docp|expo/i.test(def.key)
+  const showXmpRecommended = isXmp && _biosXmpGap
+  const wrap = document.createElement('div')
+  wrap.style.cssText = 'border-top:1px solid var(--border2);padding:12px 18px 10px' + (showXmpRecommended ? ';border:1.5px solid #b87800;border-radius:8px;margin:6px 12px;animation:xmp-pulse 2s ease-in-out infinite' : '')
+  const optionBtns = entry.options.map(opt => `
+    <button class="btn btn-sm ${opt.current ? 'btn-primary' : 'btn-ghost'}"
+      id="scewin-opt-${entry.token}-${opt.value}"
+      onclick="doBiosScewinApply('${entry.token}','${opt.value}','${entry.token}',${def.danger},${!!def.reboot})"
+      style="font-size:10px;padding:3px 10px">
+      ${opt.label}
+    </button>`).join('')
+  wrap.innerHTML = `
+    ${showXmpRecommended ? '<div style="font-size:10px;font-weight:700;color:#f0c060;margin-bottom:6px"><i class="fa fa-star"></i> Recommended — enable for free performance (your RAM is underclocked)</div>' : ''}
+    ${def.warning ? `<div class="spec-warning" style="margin-bottom:8px"><span><i class="fa fa-triangle-exclamation"></i></span>${def.warning}</div>` : ''}
+    <div style="display:flex;align-items:flex-start;gap:12px;flex-wrap:wrap">
+      <div style="flex:1;min-width:200px">
+        <div style="font-size:12px;font-weight:700;color:var(--white);margin-bottom:2px">${def.label}</div>
+        <div style="font-size:10px;color:var(--gray);line-height:1.5">${def.desc}</div>
+        ${def.reboot ? '<div style="font-size:9px;color:#f39c12;margin-top:4px"><i class="fa fa-rotate-right"></i> Reboot required</div>' : '<div style="font-size:9px;color:#2ecc71;margin-top:4px"><i class="fa fa-bolt"></i> Takes effect immediately</div>'}
+      </div>
+      <div style="display:flex;flex-direction:column;align-items:flex-end;gap:6px">
+        ${def.danger ? `<label class="danger-toggle" style="margin:0"><span><i class="fa fa-triangle-exclamation"></i> ${def.dangerLabel}</span><label class="toggle-switch"><input type="checkbox" id="scewin-tog-${entry.token}"><span class="toggle-slider"></span></label></label>` : ''}
+        <div style="display:flex;gap:4px;flex-wrap:wrap;justify-content:flex-end">${optionBtns}</div>
+        <div id="scewin-status-${entry.token}" style="font-size:10px;color:var(--gray)"></div>
+      </div>
+    </div>`
+  return wrap
+}
+
+async function doBiosScewinApply(token, value, uiToken, isDanger, needsReboot) {
+  if (isDanger) {
+    const tog = document.getElementById(`scewin-tog-${uiToken}`)
+    if (!tog?.checked) { toast('Safety Toggle Required', 'Flip the safety toggle before applying this setting.', 'warn'); return }
+  }
+  const statusEl = document.getElementById(`scewin-status-${uiToken}`)
+  if (statusEl) statusEl.textContent = 'Writing to BIOS…'
+  document.querySelectorAll(`[id^="scewin-opt-${uiToken}-"]`).forEach(btn => btn.className = btn.className.replace('btn-primary','btn-ghost'))
+  const activeBtn = document.getElementById(`scewin-opt-${uiToken}-${value}`)
+  if (activeBtn) activeBtn.className = activeBtn.className.replace('btn-ghost','btn-primary')
+  const r = await api.biosScewinWrite({ token, value, dumpPath: _biosDumpPath })
+  if (statusEl) statusEl.textContent = r.ok ? '✓ Written to BIOS' : `✗ ${r.error}`
+  if (!r.ok) {
+    document.querySelectorAll(`[id^="scewin-opt-${uiToken}-"]`).forEach(btn => btn.className = btn.className.replace('btn-primary','btn-ghost'))
+    if (activeBtn) activeBtn.className = activeBtn.className.replace('btn-ghost','btn-primary')
+    toast('BIOS Write Failed', r.restored ? (r.error || 'Write failed — previous dump restored automatically.') : (r.error || 'Could not write to BIOS.'), 'error')
+  } else if (needsReboot) {
+    toast('BIOS Setting Applied', 'This setting requires a reboot to take effect. Save your work and restart.', 'info')
+  }
+}
+
+async function doBiosDumpExport() {
+  if (_biosDumpPath) await api.openExternal(_biosDumpPath)
+}
+
+async function doRamDiagScan() {
+  const btn    = document.getElementById('ram-scan-btn')
+  const status = document.getElementById('ram-scan-status')
+  const out    = document.getElementById('ram-diag-results')
+  btn.disabled = true
+  btn.innerHTML = '<i class="fa fa-spinner fa-spin"></i> Scanning…'
+  status.textContent = 'Reading RAM info…'
+  const r = await api.getRamInfo()
+  btn.disabled = false
+  btn.innerHTML = '<i class="fa fa-memory"></i> Scan RAM'
+  if (!r.ok || !r.sticks?.length) {
+    status.textContent = 'Scan failed or no RAM detected.'
+    return
+  }
+  status.textContent = `${r.sticks.length} slot(s) found.`
+  const genLabel = (s) => s.ddr5 ? 'DDR5' : s.rated > 3200 ? 'DDR4' : s.rated > 1600 ? 'DDR4' : 'DDR3/older'
+  const voltStr  = (mv) => mv ? `${(mv / 1000).toFixed(3)}V` : '—'
+  out.innerHTML = `
+    <div style="padding:0 18px 14px;display:grid;gap:8px">
+      ${r.sticks.map(s => `
+        <div style="background:#111;border:1px solid var(--border2);border-radius:8px;padding:10px 14px;display:grid;grid-template-columns:auto 1fr;gap:4px 16px;align-items:start">
+          <div style="font-size:11px;font-weight:800;color:var(--white);grid-column:1/-1;margin-bottom:4px">
+            <i class="fa fa-memory" style="color:var(--pink)"></i> ${s.slot} — ${s.cap}GB ${genLabel(s)}
+          </div>
+          <div style="font-size:10px;color:var(--gray)">Rated Speed</div>       <div style="font-size:10px;color:var(--white)">${s.rated ? s.rated + ' MHz' : '—'}</div>
+          <div style="font-size:10px;color:var(--gray)">Running At</div>        <div style="font-size:10px;color:var(--white)">${s.actual ? s.actual + ' MHz' + (s.ddr5 ? ' (DDR5 half-rate reported)' : '') : '—'}</div>
+          <div style="font-size:10px;color:var(--gray)">Voltage</div>           <div style="font-size:10px;color:var(--white)">${voltStr(s.volt)} (min ${voltStr(s.minV)} / max ${voltStr(s.maxV)})</div>
+          <div style="font-size:10px;color:var(--gray)">Manufacturer</div>      <div style="font-size:10px;color:var(--white)">${s.mfr || '—'}</div>
+          <div style="font-size:10px;color:var(--gray)">Part Number</div>       <div style="font-size:10px;color:var(--white);font-family:monospace">${s.part || '—'}</div>
+        </div>`).join('')}
+    </div>`
+
+  // CPU-Z timings row
+  const t = await api.cpuzReadTimings()
+  const timingsDiv = document.createElement('div')
+  timingsDiv.style.cssText = 'padding:0 18px 14px'
+  if (t.ok && t.cl) {
+    timingsDiv.innerHTML = `<div style="background:#111;border:1px solid var(--border2);border-radius:8px;padding:10px 14px;font-size:11px">
+      <div style="font-weight:700;color:var(--white);margin-bottom:6px"><i class="fa fa-stopwatch" style="color:var(--pink)"></i> Memory Timings (CPU-Z)</div>
+      <div style="color:var(--gray);font-family:monospace;font-size:12px;letter-spacing:0.5px">
+        CL${t.cl} &nbsp;·&nbsp; tRCD${t.trcd} &nbsp;·&nbsp; tRP${t.trp} &nbsp;·&nbsp; tRAS${t.tras} &nbsp;·&nbsp; CR${t.cr} &nbsp;@&nbsp; ${t.freq} MHz
+      </div>
+    </div>`
+  } else {
+    timingsDiv.innerHTML = `<div style="font-size:10px;color:var(--gray);padding:4px 0">Detailed timings unavailable — place <code>cpuz_x64.exe</code> in <code>assets\\cpuz\\</code> for timing data.</div>`
+  }
+  out.appendChild(timingsDiv)
+}
+
+function ryzenPreset(ppt, tdc, edc) {
+  const pptEl = document.getElementById('ryzen-ppt')
+  const tdcEl = document.getElementById('ryzen-tdc')
+  const edcEl = document.getElementById('ryzen-edc')
+  if (!pptEl) return
+  pptEl.value = ppt; document.getElementById('ryzen-ppt-val').textContent = ppt + 'W'
+  tdcEl.value = tdc; document.getElementById('ryzen-tdc-val').textContent = tdc + 'A'
+  edcEl.value = edc; document.getElementById('ryzen-edc-val').textContent = edc + 'A'
+}
+
+async function doRyzenAdjRead() {
+  const btn    = document.getElementById('ryzen-read-btn')
+  const status = document.getElementById('ryzen-read-status')
+  btn.disabled = true
+  btn.innerHTML = '<i class="fa fa-spinner fa-spin"></i> Reading…'
+  const r = await api.getRyzenAdjInfo()
+  btn.disabled = false
+  btn.innerHTML = '<i class="fa fa-rotate"></i> Read Current Limits'
+  if (!r.ok) {
+    status.textContent = r.error === 'not_found' ? 'ryzenadj.exe not found — place it in assets\\ryzenadj\\' : 'Read failed.'
+    return
+  }
+  const ppt = Math.round(r.ppt), tdc = Math.round(r.tdc), edc = Math.round(r.edc)
+  if (ppt > 0) { document.getElementById('ryzen-ppt').value = ppt; document.getElementById('ryzen-ppt-val').textContent = ppt + 'W' }
+  if (tdc > 0) { document.getElementById('ryzen-tdc').value = tdc; document.getElementById('ryzen-tdc-val').textContent = tdc + 'A' }
+  if (edc > 0) { document.getElementById('ryzen-edc').value = edc; document.getElementById('ryzen-edc-val').textContent = edc + 'A' }
+  status.textContent = `Current: PPT ${ppt}W / TDC ${tdc}A / EDC ${edc}A`
+}
+
+async function doRyzenAdjApply() {
+  const tog = document.getElementById('tog-ryzenadj')
+  if (!tog?.checked) { toast('Safety Toggle Required', 'Enable the safety toggle before applying CPU power limits.', 'warn'); return }
+  const ppt = parseInt(document.getElementById('ryzen-ppt').value)
+  const tdc = parseInt(document.getElementById('ryzen-tdc').value)
+  const edc = parseInt(document.getElementById('ryzen-edc').value)
+  const status = document.getElementById('ryzen-apply-status')
+  if (status) status.textContent = 'Applying…'
+  const r = await api.applyRyzenAdj({ ppt, tdc, edc })
+  if (r.ok) {
+    if (status) status.textContent = `✓ Applied: PPT ${ppt}W / TDC ${tdc}A / EDC ${edc}A — resets on reboot`
+    toast('CPU Limits Applied', `PPT ${ppt}W / TDC ${tdc}A / EDC ${edc}A\nChanges are temporary and will reset on reboot.`, 'info')
+  } else {
+    if (status) status.textContent = '✗ Failed'
+    const msg = r.error === 'not_found'
+      ? 'ryzenadj.exe not found. Place it in assets\\ryzenadj\\ inside the app folder.'
+      : (r.error || 'RyzenAdj failed. Your CPU may not be supported.')
+    toast('RyzenAdj Failed', msg, 'error')
+  }
+}
+
 let _latencyInterval = null
 const _latencyHistory = { dpc: [], isr: [] }
 const LATENCY_MAX_POINTS = 60
@@ -5528,6 +5980,9 @@ function buildDashboard(c) {
   const netSpeed = si.nicSpeed ? `${si.nicSpeed} Gbps` : ''
   const osCaption = si.osCaption || si.os || 'Windows'
   const driverVer = si.gpuDriver || ''
+  const displayStr = si.displayRes ? `${si.displayRes.replace('x','×')}${si.displayRefresh ? ' @ ' + si.displayRefresh + ' Hz' : ''}` : ''
+  const storageStr = si.diskModel || (si.diskType || '')
+  const storageSub = [si.diskType && si.diskModel ? si.diskType : '', si.diskUsedGB && si.diskTotalGB ? `${si.diskUsedGB} / ${si.diskTotalGB} GB used` : ''].filter(Boolean).join(' · ')
 
   // Changelog feed — show latest version's items
   const wn = window._whatsNew?.[0]
@@ -5671,6 +6126,21 @@ function buildDashboard(c) {
           <td><div class="specs-val" style="color:var(--muted);font-size:11px">${si.computerName || '—'}</div>
               <div class="specs-sub">${osCaption}</div></td>
         </tr>
+        ${storageStr ? `<tr>
+          <td class="specs-key">Storage</td>
+          <td><div class="specs-val" style="font-size:11px">${storageStr}</div>
+              <div class="specs-sub">${storageSub}</div></td>
+        </tr>` : ''}
+        ${displayStr ? `<tr>
+          <td class="specs-key">Display</td>
+          <td><div class="specs-val" style="font-size:11px">${displayStr}</div></td>
+        </tr>` : ''}
+        <tr>
+          <td class="specs-key">Temps</td>
+          <td><div id="spec-temps-row" class="specs-sub" style="padding-top:2px">
+            <span style="color:var(--gray);font-size:10px"><i class="fa fa-spinner fa-spin"></i> Loading…</span>
+          </div></td>
+        </tr>
       </table>
     </div>
 
@@ -5741,6 +6211,23 @@ function buildDashboard(c) {
   showHealthNudgeIfNeeded()
   drawTempCanvas('cpu', [])
   drawTempCanvas('gpu', [])
+}
+
+async function loadDashboardTemps() {
+  const el = document.getElementById('spec-temps-row')
+  if (!el) return
+  const r = await api.getTemps().catch(() => null)
+  if (!r || !r.ok) {
+    const lhmMissing = !r || r.reason === 'lhm_not_running'
+    el.innerHTML = lhmMissing
+      ? '<span style="color:var(--gray);font-size:10px">Place <code>LibreHardwareMonitor.exe</code> in <code>assets\\lhm\\</code> for live temps</span>'
+      : '<span style="color:var(--gray);font-size:10px">Temperature data unavailable</span>'
+    return
+  }
+  const col = (v, warn, crit) => v >= crit ? '#e74c3c' : v >= warn ? '#f39c12' : '#2ecc71'
+  const fmt = (v, warn, crit) => v > 0 ? `<span style="color:${col(v,warn,crit)};font-weight:700">${v.toFixed(0)}°C</span>` : '—'
+  const load = (v) => v > 0 ? ` <span style="color:var(--gray)">${v.toFixed(0)}%</span>` : ''
+  el.innerHTML = `CPU ${fmt(r.cpuTemp,70,85)}${load(r.cpuLoad)} &nbsp;·&nbsp; GPU ${fmt(r.gpuTemp,75,90)}${load(r.gpuLoad)}${r.gpuVramUsed > 0 ? ` &nbsp;·&nbsp; <span style="color:var(--gray)">VRAM ${r.gpuVramUsed.toFixed(0)} MB used</span>` : ''}`
 }
 
 function buildSpecWarnings() {
@@ -5840,36 +6327,7 @@ function runAutoOpti() {
   aomCheckGates()
 }
 
-function aomRenderLangStep() {
-  document.getElementById('aom-step-label').textContent = 'Choose Language / Valitse kieli'
-  ;[1,2,3,4].forEach(i => document.getElementById(`aom-ind-${i}`).style.background = '#222')
-  document.getElementById('aom-body').innerHTML = `
-    <div style="text-align:center;padding:20px 0 24px">
-      <div style="width:52px;height:52px;border-radius:14px;background:rgba(52,152,219,0.1);border:1px solid rgba(52,152,219,0.3);display:flex;align-items:center;justify-content:center;font-size:22px;color:#3498db;margin:0 auto 16px">
-        <i class="fa fa-globe"></i>
-      </div>
-      <div style="font-size:15px;font-weight:800;color:var(--white);margin-bottom:6px">Choose Language / Valitse kieli</div>
-      <div style="font-size:11px;color:var(--gray);margin-bottom:24px">You can change this anytime from the titlebar. / Voit vaihtaa kielen milloin tahansa otsikkopalkista.</div>
-      <div style="display:flex;gap:12px;justify-content:center">
-        <button onclick="aomPickLang('en')" style="padding:14px 28px;border-radius:10px;border:2px solid #2a2a3a;background:#111;color:var(--white);font-size:13px;font-weight:700;cursor:pointer;transition:all .15s;display:flex;flex-direction:column;align-items:center;gap:4px" onmouseover="this.style.borderColor='rgba(52,152,219,0.5)'" onmouseout="this.style.borderColor='#2a2a3a'">
-          <span style="font-size:24px">🇬🇧</span>English
-        </button>
-        <button onclick="aomPickLang('fi')" style="padding:14px 28px;border-radius:10px;border:2px solid #2a2a3a;background:#111;color:var(--white);font-size:13px;font-weight:700;cursor:pointer;transition:all .15s;display:flex;flex-direction:column;align-items:center;gap:4px" onmouseover="this.style.borderColor='rgba(52,152,219,0.5)'" onmouseout="this.style.borderColor='#2a2a3a'">
-          <span style="font-size:24px">🇫🇮</span>Suomi
-        </button>
-      </div>
-    </div>`
-  document.getElementById('aom-footer').innerHTML = ''
-}
-
-function aomPickLang(lang) {
-  setLanguage(lang)
-  aomCheckGates()
-}
-
 function aomCheckGates() {
-  // Gate 0: Language selection (first launch only)
-  if (!settings.language) { aomRenderLangStep(); return }
 
   // Gate 1: Windows Health check
   const healthTs = parseInt(localStorage.getItem('health_check_ts') || '0')
@@ -6599,7 +7057,7 @@ function buildWindowsOpti(c) {
       { id:'disable-background-apps', name:'Disable UWP Background Apps', desc:'Stops all UWP apps (News, Weather, Mail, Xbox etc.) from running silently in the background. Real CPU and RAM saving during gaming.', icon:'<i class="fa fa-ban"></i>' },
       { id:'disable-auto-maintenance', name:'Disable Automatic Maintenance', desc:'Prevents Windows from running disk scans, defrag and security checks mid-session. Eliminates the frame time spikes caused by background maintenance tasks.', icon:'<i class="fa fa-screwdriver-wrench"></i>' },
       { id:'disable-delivery-opt', name:'Disable Windows Update P2P Sharing', desc:'Stops Windows using your internet connection to upload updates to other PCs. Removes background bandwidth usage and CPU overhead during sessions.', icon:'<i class="fa fa-arrows-turn-to-dots"></i>' },
-      { id:'usb-suspend', name:'Disable USB Selective Suspend', desc:'Prevents Windows from cutting power to USB devices between inputs. Eliminates the micro-stutter and disconnect issues you get from mice and headsets mid-game.', icon:'<i class="fa fa-usb fab"></i>', warning: isLaptop ? 'Laptop: increases battery drain slightly.' : 'If you use Logitech G HUB, disable it from startup first — this tweak can cause it to register phantom keyboard devices, leading to mouse ghosting and audio beeping.' },
+      { id:'usb-suspend', name:'Disable USB Selective Suspend', desc:'Prevents Windows from cutting power to USB devices between inputs. Eliminates micro-stutter and mouse ghosting after sleep/wake and monitor switches. Applied at both power plan and per-device level so it survives screen sleep.', icon:'<i class="fa fa-usb fab"></i>', warning: isLaptop ? 'Laptop: increases battery drain slightly.' : 'If you use Logitech G HUB, disable it from startup first — this tweak can cause it to register phantom keyboard devices, leading to mouse ghosting and audio beeping.' },
     ]},
     { title:'Registry & Scheduling', cards:[
       { id:'mmcss',           name:'MMCSS Game Scheduling (GPU Priority=8)', desc:'Configures Windows Multimedia Class Scheduler to maximise CPU time slices for games. SystemResponsiveness is set to 10 (safe) — never 0, which would starve USB/HID drivers.', icon:'<i class="fa fa-bullseye"></i>' },
@@ -6627,7 +7085,7 @@ function buildWindowsOpti(c) {
     { title:'Input & Aim', cards:[
       { id:'raw-aim-curve',    name:'Raw Aim Curve', desc:'Sets MouseSensitivity registry curve to a flat 1:1 raw input table. Eliminates any hidden Windows pointer curve for perfect aim consistency.', icon:'<i class="fa fa-crosshairs"></i>' },
       { id:'proximity-deny',  name:'Proximity Deny (Nearby Sharing Off)', desc:'Disables Windows Nearby Sharing service. Stops background Bluetooth/Wi-Fi proximity scans that cause micro-stutters.', icon:'<i class="fa fa-ban"></i>' },
-      { id:'cursor-max-rate', name:'Cursor Max Rate (8000Hz+ support)', desc:'Sets HIDDeviceInputProcessingMode=0 to allow high-polling-rate mice (up to 8000Hz) without Windows rate-limiting them.', icon:'<i class="fa fa-computer-mouse"></i>' },
+      { id:'cursor-max-rate', name:'Cursor Max Rate (8000Hz+ support)', desc:'Sets HIDDeviceInputProcessingMode=0 (unified HID input thread) and increases mouse data queue size. Fixes mouse flicking and click loss when dragging windows between monitors. Also allows 8000Hz polling mice without Windows rate-limiting them. Reboot required.', icon:'<i class="fa fa-computer-mouse"></i>' },
       { id:'nudge-blocker',   name:'Nudge Blocker (Disable AutoPlay nudges)', desc:'Disables AutoPlay notifications that pop up when inserting USB devices mid-game.', icon:'<i class="fa fa-circle-xmark"></i>' },
       { id:'sticky-keys-guard', name:'StickyKeys Guard (Disable accidentally)', desc:'Disables StickyKeys, FilterKeys and ToggleKeys hotkeys entirely. Prevents them from triggering mid-game when pressing Shift 5x or holding keys.', icon:'<i class="fa fa-keyboard"></i>' },
     ]},
@@ -6655,7 +7113,7 @@ function buildWindowsOpti(c) {
       { id:'defender-quiet',      name:'Defender Quiet Mode', desc:'Disables Defender notifications and action center integration without disabling scanning entirely.', icon:'<i class="fa fa-bell-slash"></i>' },
       { id:'diag-tasks-off',      name:'Diagnostic Tasks Off', desc:'Disables Windows diagnostic scheduled tasks (DPS, WDI, PerfTrack) that run in the background and cause periodic disk/CPU spikes.', icon:'<i class="fa fa-stethoscope"></i>' },
       { id:'diagnostics-off',     name:'Diagnostics Services Off', desc:'Stops and disables Diagnostic Policy Service and related diagnostic services. Reduces background CPU overhead.', icon:'<i class="fa fa-wrench"></i>' },
-      { id:'usb-power-guard',     name:'USB Power Guard', desc:'Sets USB hub selective suspend to disabled across all power schemes. Prevents USB devices from disconnecting during inactivity.', icon:'<i class="fa fa-usb fab"></i>', warning:'If you use Logitech G HUB, disable it from startup first — this tweak can cause it to register phantom keyboard devices, leading to mouse ghosting and audio beeping.' },
+      { id:'usb-power-guard',     name:'USB Power Guard', desc:'Disables USB selective suspend at power plan level, USB service level, and per-device level. Prevents mouse ghosting after screen sleep and during multi-monitor window drags.', icon:'<i class="fa fa-usb fab"></i>', warning:'If you use Logitech G HUB, disable it from startup first — this tweak can cause it to register phantom keyboard devices, leading to mouse ghosting and audio beeping.' },
       { id:'capability-ruleset',  name:'Capability Ruleset (App Permissions Lock)', desc:'Restricts background app capabilities via AppPrivacy policy — location, camera, microphone access blocked for background processes.', icon:'<i class="fa fa-lock"></i>' },
     ]},
     { title:'CPU Scheduling', cards:[
@@ -7048,19 +7506,35 @@ const GAME_LIST = [
   { id:'apex',          name:'Apex Legends',        dev:'Respawn Entertainment', emoji:'<i class="fa fa-dragon"></i>', installed:false, running:false, installPath:null, lastPlayed:null },
   { id:'warzone',       name:'Warzone',             dev:'Activision',            emoji:'<i class="fa fa-skull"></i>', installed:false, running:false, installPath:null, lastPlayed:null },
   { id:'rust',          name:'Rust',                dev:'Facepunch Studios',     emoji:'<i class="fa fa-wrench"></i>', installed:false, running:false, installPath:null, lastPlayed:null },
-  { id:'the-finals',    name:'THE FINALS',          dev:'Embark Studios',        emoji:'<i class="fa fa-trophy"></i>', installed:false, running:false, installPath:null, lastPlayed:null },
+  { id:'the-finals',    name:'THE FINALS',             dev:'Embark Studios',        emoji:'<i class="fa fa-trophy"></i>', installed:false, running:false, installPath:null, lastPlayed:null },
+  { id:'r6siege',       name:'Rainbow Six Siege',      dev:'Ubisoft',               emoji:'<i class="fa fa-shield-halved"></i>', installed:false, running:false, installPath:null, lastPlayed:null },
+  { id:'overwatch2',    name:'Overwatch 2',             dev:'Blizzard',              emoji:'<i class="fa fa-globe"></i>', installed:false, running:false, installPath:null, lastPlayed:null },
+  { id:'tarkov',        name:'Escape from Tarkov',      dev:'Battlestate Games',     emoji:'<i class="fa fa-person-rifle"></i>', installed:false, running:false, installPath:null, lastPlayed:null },
+  { id:'squad',         name:'Squad',                   dev:'Offworld Industries',   emoji:'<i class="fa fa-users"></i>', installed:false, running:false, installPath:null, lastPlayed:null },
+  { id:'dayz',          name:'DayZ',                    dev:'Bohemia Interactive',   emoji:'<i class="fa fa-biohazard"></i>', installed:false, running:false, installPath:null, lastPlayed:null },
+  { id:'cyberpunk',     name:'Cyberpunk 2077',          dev:'CD Projekt Red',        emoji:'<i class="fa fa-city"></i>', installed:false, running:false, installPath:null, lastPlayed:null },
+  { id:'rdr2',          name:'Red Dead Redemption 2',   dev:'Rockstar Games',        emoji:'<i class="fa fa-horse"></i>', installed:false, running:false, installPath:null, lastPlayed:null },
+  { id:'pubg',          name:'PUBG',                    dev:'Krafton',               emoji:'<i class="fa fa-parachute-box"></i>', installed:false, running:false, installPath:null, lastPlayed:null },
 ]
 const GAME_TIPS = {
-  fortnite: 'NVIDIA Control Panel: set Low Latency Mode = Ultra for FortniteClient-Win64-Shipping.exe.',
-  gtav: 'Add -dx11 as Rockstar Launcher launch argument for better CPU performance on older CPUs.',
-  valorant: 'Disable Multithreaded Rendering if you experience stutters on older CPUs.',
+  fortnite:      'NVIDIA Control Panel: set Low Latency Mode = Ultra for FortniteClient-Win64-Shipping.exe.',
+  gtav:          'Add -dx11 as Rockstar Launcher launch argument for better CPU performance on older CPUs.',
+  valorant:      'Disable Multithreaded Rendering if you experience stutters on older CPUs.',
   'arma-reforger': 'Use Exclusive Fullscreen + disable VSync in Arma Reforger settings for best FPS.',
-  minecraft: 'Install Sodium + Lithium (Fabric) for 2–5× more FPS on Java Edition.',
-  cs2: 'Launch options: -novid -nojoy -fullscreen +fps_max 0 +mat_queue_mode 2',
-  apex: '+fps_max unlimited in Origin/EA App launch options for uncapped frames.',
-  warzone: 'Use Fullscreen Exclusive + disable in-game V-Sync for lowest input latency.',
-  rust: 'Steam: -window-mode exclusive -high -maxMem=8192 -malloc=system -force-d3d11',
-  'the-finals': 'Fullscreen Exclusive and V-Sync off for lowest input latency.',
+  minecraft:     'Install Sodium + Lithium (Fabric) for 2–5× more FPS on Java Edition.',
+  cs2:           'Launch options: -novid -nojoy -fullscreen +fps_max 0 +mat_queue_mode 2',
+  apex:          '+fps_max unlimited in Origin/EA App launch options for uncapped frames.',
+  warzone:       'Use Fullscreen Exclusive + disable in-game V-Sync for lowest input latency.',
+  rust:          'Steam: -window-mode exclusive -high -maxMem=8192 -malloc=system -force-d3d11',
+  'the-finals':  'Fullscreen Exclusive and V-Sync off for lowest input latency.',
+  r6siege:       'Disable Ubisoft overlay for lower input lag. Set texture quality to medium for highest FPS on competitive maps.',
+  overwatch2:    'Set Render Scale to 100%. Dynamic Render Scale causes frame time spikes — disable it.',
+  tarkov:        'Disable HD textures. Set object LOD to 2. Disable SSR. Use fullscreen (not borderless) for lowest latency.',
+  squad:         'Lower shadows to medium. Disable ambient occlusion. Use DirectX 11 mode for best stability.',
+  dayz:          'Lower view distance to 1200m. Shadows on low. Disable volumetric clouds for best FPS.',
+  cyberpunk:     'Enable DLSS or FSR. Set crowd density to low. Disable ray tracing for competitive performance.',
+  rdr2:          'Lower grass quality and shadows first — they are the biggest GPU cost. TAA sharpening to 100%.',
+  pubg:          'Use Smooth + Unlocked framerate preset. Disable V-Sync. Lower foliage to very low.',
 }
 let selectedGameId = 'fortnite'
 let gpScanned = false
