@@ -4,6 +4,11 @@ const { exec, execFile, spawn } = require('child_process')
 const fs = require('fs')
 const os = require('os')
 
+// ─── Debug log (writes to %TEMP%\jylli-debug.txt for diagnosing analytics) ───
+function debugLog(msg) {
+  try { fs.appendFileSync(path.join(os.tmpdir(), 'jylli-debug.txt'), `${new Date().toISOString()} ${msg}\n`) } catch {}
+}
+
 // ─── Constants ───────────────────────────────────────────────────────────────
 const IS_WIN = process.platform === 'win32'
 
@@ -265,8 +270,11 @@ function sendWebhook(payload, targetUrl) {
 }
 
 function notifyBot(event, extra = {}) {
+  debugLog('[notifyBot] called: ' + event)
   try {
-    if (loadSettings().analyticsOptOut) return
+    const optOut = loadSettings().analyticsOptOut
+    debugLog('[notifyBot] optOut: ' + optOut)
+    if (optOut) return
     const { winVer, cpu, ram, gpu, isLaptop, isWifi, hasFiveM } = getSystemFields()
     const analytics = loadAnalytics()
     const payload = JSON.stringify({
@@ -276,15 +284,17 @@ function notifyBot(event, extra = {}) {
       cpu, ram, gpu, winVer, isLaptop, isWifi, hasFiveM,
       ...extra
     })
+    debugLog('[notifyBot] sending to: ' + BOT_URL)
     const url = new URL(BOT_URL)
     const req = require('https').request({
       hostname: url.hostname, path: '/',
       method: 'POST', headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(payload) }
     })
-    req.on('error', () => {})
+    req.on('response', r => debugLog('[notifyBot] response: ' + r.statusCode))
+    req.on('error', e => debugLog('[notifyBot] error: ' + e.message))
     req.write(payload)
     req.end()
-  } catch {}
+  } catch (e) { debugLog('[notifyBot] threw: ' + e.message) }
 }
 
 // ── Shared helper: build system info fields ───────────────────────────────────
@@ -311,6 +321,7 @@ getSystemFields._cachedIsLaptop = false
 getSystemFields._cachedIsWifi   = false
 
 function webhookLaunch() {
+  debugLog('[webhookLaunch] called')
   try {
     const analytics = loadAnalytics()
     const now    = new Date()
@@ -341,7 +352,7 @@ function webhookLaunch() {
         ? Math.floor((nowMs - new Date(lastSeenIso).getTime()) / 86400000) : null
       notifyBot('session_start', { daysSinceLast })
     }
-  } catch {}
+  } catch (e) { debugLog('[webhookLaunch] threw: ' + e.message) }
 }
 
 function webhookSessionEnd(durationMs, pageVisits, tweaksThisSession) {
@@ -4967,6 +4978,10 @@ ipcMain.handle('run-preflight-scan', async () => {
 })
 
 // ─── Auto-Updater ─────────────────────────────────────────────────────────────
+// Each GitHub release MUST have these 3 assets or the updater breaks:
+//   latest.yml  (electron-builder generates in dist/ — upload manually)
+//   Jylli Tool Setup.exe
+//   Jylli Tool Setup.exe.blockmap
 let autoUpdater = null
 try {
   const { autoUpdater: au } = require('electron-updater')
@@ -5009,6 +5024,17 @@ ipcMain.handle('install-update', () => {
 
 // What's New content
 const WHATS_NEW = [
+  { version: '1.3.9', date: 'May 2026', items: [
+    'Settings tab — replaces Personalization; organized into Appearance, Behavior, System, and About sections',
+    'Tweak health check — "Check for Updates" now also scans the registry to verify your applied tweaks are still active; detects any reverted by Windows Update and lets you re-apply with one click',
+    'Update checker — shows how many improvements are in the new version when an update is available',
+    'Antivirus tip — detects aggressive AV (Norton, McAfee, Bitdefender, etc.) on first launch and suggests adding Jylli Tool to exclusions',
+    'Three new themes — Amber, Rose, and Neon added to the theme picker',
+    'Advanced Mode modal — now only warns about BIOS Tuner specifically instead of all advanced tools generically',
+    'Bug fix — Auto-Optimize no longer blocked when restore point creation fails',
+    'Bug fix — metrics polling paused while a game is active (reduces background CPU usage in-game)',
+    'Bug fix — GPU spec filtering hides NVIDIA/AMD-specific sections based on detected hardware',
+  ]},
   { version: '1.3.8', date: 'May 2026', items: [
     'Personalization — custom accent color picker: override the accent color for any theme and save it across sessions',
     'Scheduler — 3 new scheduled actions: Free RAM, Check Windows Updates, Clear Downloads Folder',
@@ -5102,6 +5128,64 @@ const WHATS_NEW = [
 ]
 
 ipcMain.handle('get-whats-new', () => WHATS_NEW)
+
+// ─── Tweak Health Verification ────────────────────────────────────────────────
+// One representative registry key per tweak. Tweaks using only services/bcdedit/one-time
+// ops are omitted — they won't be checked (honest rather than wrong).
+const TWEAK_VERIFY = {
+  'game-dvr':              { hive: 'HKCU', path: 'System\\GameConfigStore',                                                        name: 'GameDVR_Enabled',          expect: 0 },
+  'visual-effects':        { hive: 'HKCU', path: 'Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\VisualEffects',           name: 'VisualFXSetting',          expect: 2 },
+  'mmcss':                 { hive: 'HKLM', path: 'SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\Multimedia\\SystemProfile',      name: 'SystemResponsiveness',     expect: 10 },
+  'net-throttling':        { hive: 'HKLM', path: 'SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\Multimedia\\SystemProfile',      name: 'NetworkThrottlingIndex',   expect: 4294967295 },
+  'power-throttling':      { hive: 'HKLM', path: 'SYSTEM\\CurrentControlSet\\Control\\Power\\PowerThrottling',                     name: 'PowerThrottlingOff',       expect: 1 },
+  'priority-sep':          { hive: 'HKLM', path: 'SYSTEM\\CurrentControlSet\\Control',                                             name: 'Win32PrioritySeparation',  expect: 38 },
+  'tdr-delay':             { hive: 'HKLM', path: 'SYSTEM\\CurrentControlSet\\Control\\GraphicsDrivers',                            name: 'TdrDelay',                 expect: 8 },
+  'gpu-hwsch':             { hive: 'HKLM', path: 'SYSTEM\\CurrentControlSet\\Control\\GraphicsDrivers',                            name: 'HwSchMode',                expect: 2 },
+  'nvme-latency':          { hive: 'HKLM', path: 'SYSTEM\\CurrentControlSet\\Control\\StorPort',                                   name: 'TotalRequestHoldTime',     expect: 0 },
+  'win-tips':              { hive: 'HKLM', path: 'SOFTWARE\\Policies\\Microsoft\\Windows\\CloudContent',                           name: 'DisableSoftLanding',       expect: 1 },
+  'telemetry':             { hive: 'HKLM', path: 'SOFTWARE\\Policies\\Microsoft\\Windows\\DataCollection',                         name: 'AllowTelemetry',           expect: 0 },
+  'disable-delivery-opt':  { hive: 'HKLM', path: 'SOFTWARE\\Policies\\Microsoft\\Windows\\DeliveryOptimization',                   name: 'DODownloadMode',           expect: 0 },
+  'disable-wpad':          { hive: 'HKCU', path: 'Software\\Microsoft\\Windows\\CurrentVersion\\Internet Settings\\Wpad',          name: 'WpadOverride',             expect: 1 },
+  'disable-netbios':       { hive: 'HKLM', path: 'SYSTEM\\CurrentControlSet\\Services\\NetBT\\Parameters',                        name: 'NodeType',                 expect: 2 },
+  'qos-reserve':           { hive: 'HKLM', path: 'SOFTWARE\\Policies\\Microsoft\\Windows\\Psched',                                 name: 'NonBestEffortLimit',       expect: 0 },
+  'disable-mouse-accel':   { hive: 'HKCU', path: 'Control Panel\\Mouse',                                                          name: 'MouseSpeed',               expect: '0' },
+  'disable-background-apps':{ hive: 'HKLM', path: 'SOFTWARE\\Policies\\Microsoft\\Windows\\AppPrivacy',                            name: 'LetAppsRunInBackground',   expect: 2 },
+  'cortana':               { hive: 'HKLM', path: 'SOFTWARE\\Policies\\Microsoft\\Windows\\Windows Search',                         name: 'AllowCortana',             expect: 0 },
+  'disable-hdcp':          { hive: 'HKLM', path: 'SOFTWARE\\Policies\\Microsoft\\Windows\\HDCP',                                   name: 'HdcpPolicy',               expect: 0 },
+  'disable-auto-maintenance': { hive: 'HKLM', path: 'SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\Schedule\\Maintenance',      name: 'MaintenanceDisabled',      expect: 1 },
+  'explorer-perf':         { hive: 'HKCU', path: 'Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\Advanced',               name: 'LaunchTo',                 expect: 1 },
+}
+
+ipcMain.handle('run-tweak-health', async () => {
+  const settings = loadSettings()
+  const appliedIds = Object.entries(settings)
+    .filter(([k, v]) => k.startsWith('tweak_') && v === 'applied')
+    .map(([k]) => k.replace(/^tweak_/, ''))
+
+  const verifiable = appliedIds.filter(id => TWEAK_VERIFY[id])
+  const reverted = []
+
+  for (const id of verifiable) {
+    const v = TWEAK_VERIFY[id]
+    try {
+      const script = `(Get-ItemProperty -Path "Registry::${v.hive}\\${v.path}" -Name "${v.name}" -ErrorAction Stop)."${v.name}"`
+      const result = await runPS(script)
+      const raw = (result.out || '').trim()
+      if (!result.ok || String(raw) !== String(v.expect)) reverted.push(id)
+    } catch {
+      reverted.push(id)
+    }
+  }
+
+  return { checked: verifiable.length, reverted }
+})
+
+ipcMain.handle('detect-av', async () => {
+  try {
+    const r = await runPS(`(Get-CimInstance -Namespace root/SecurityCenter2 -ClassName AntiVirusProduct -ErrorAction Stop | Select-Object -ExpandProperty displayName) -join ','`)
+    return r.out || ''
+  } catch { return '' }
+})
 
 // ─── App Optimizer IPC ────────────────────────────────────────────────────────
 const APP_OPTIMIZER_TWEAKS = {
