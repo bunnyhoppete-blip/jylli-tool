@@ -5043,11 +5043,14 @@ ipcMain.handle('install-update', () => {
 const WHATS_NEW = [
   { version: '1.3.9', date: 'May 2026', items: [
     'Settings tab — replaces Personalization; organized into Appearance, Behavior, System, and About sections',
+    'Discord Rich Presence toggle — enable or disable Discord status directly from Settings',
     'Tweak health check — "Check for Updates" now also scans the registry to verify your applied tweaks are still active; detects any reverted by Windows Update and lets you re-apply with one click',
     'Update checker — shows how many improvements are in the new version when an update is available',
     'Antivirus tip — detects aggressive AV (Norton, McAfee, Bitdefender, etc.) on first launch and suggests adding Jylli Tool to exclusions',
     'Three new themes — Amber, Rose, and Neon added to the theme picker',
     'Advanced Mode modal — now only warns about BIOS Tuner specifically instead of all advanced tools generically',
+    'Bug fix — fullscreen flicker eliminated: Auto-Pulse no longer shows Windows notifications that interrupted fullscreen exclusive games',
+    'Bug fix — AMD Max Powerplan now works on systems missing the Balanced power scheme (falls back to High Performance)',
     'Bug fix — Auto-Optimize no longer blocked when restore point creation fails',
     'Bug fix — metrics polling paused while a game is active (reduces background CPU usage in-game)',
     'Bug fix — GPU spec filtering hides NVIDIA/AMD-specific sections based on detected hardware',
