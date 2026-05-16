@@ -624,7 +624,9 @@ app.whenReady().then(() => {
   PROFILES_PATH  = path.join(userData, 'jt_profiles.json')
   CHANGELOG_PATH = path.join(userData, 'jt_changelog.json')
   APP_VERSION    = app.getVersion()
-  createWindow(); createTray(); initDiscordRPC(); webhookLaunch()
+  createWindow(); createTray()
+  if (loadSettings().discordRpcEnabled !== false) initDiscordRPC()
+  webhookLaunch()
   startLhm()
 })
 app.on('window-all-closed', () => { /* stay alive in tray */ })
@@ -1205,6 +1207,13 @@ ipcMain.handle('delete-profile', (_, name) => {
 ipcMain.handle('open-external', (_, url) => shell.openExternal(url))
 
 // ─── Discord RPC update handlers ──────────────────────────────────────────────
+ipcMain.handle('set-discord-rpc', async (_, enabled) => {
+  if (enabled) {
+    if (!discordRPC) initDiscordRPC()
+  } else {
+    await destroyDiscordRPC()
+  }
+})
 ipcMain.handle('discord-set-page', (_, page) => {
   discordCurrentPage = page
   if (!discordActivityOverride) updateDiscordPresence()
@@ -2520,9 +2529,17 @@ const TWEAKS = {
       const cpuName = cpuR.out.trim()
       if (!cpuName.toLowerCase().includes('amd')) { s(`CPU detected: ${cpuName} — this plan is for AMD CPUs.`, 'warn'); return }
       s(`AMD CPU: ${cpuName}`, 'info')
-      const r = await cmd('powercfg -duplicatescheme e9a42b02-d5df-448d-aa00-03f14749eb61')
-      const m = r.out.match(/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})/i)
-      if (!m) { s('Could not create power plan.', 'warn'); return }
+      let r = await cmd('powercfg -duplicatescheme e9a42b02-d5df-448d-aa00-03f14749eb61')
+      let m = r.out.match(/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})/i)
+      if (!m) {
+        r = await cmd('powercfg -duplicatescheme 8c5e7fda-e8bf-4a96-9a85-a6e23a8c635c')
+        m = r.out.match(/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})/i)
+      }
+      if (!m) {
+        r = await cmd('powercfg -duplicatescheme SCHEME_CURRENT')
+        m = r.out.match(/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})/i)
+      }
+      if (!m) { s('Could not create power plan — run powercfg /restoredefaultschemes in an admin terminal then retry.', 'warn'); return }
       const g = m[1]
       await cmd(`powercfg /changename ${g} "AMD Max Performance" "Jylli Tool - AMD-optimised max performance plan"`)
       await cmd(`powercfg /setacvalueindex ${g} SUB_PROCESSOR PERFBOOSTMODE 2`)
@@ -6382,13 +6399,6 @@ ipcMain.handle('start-game-watcher', async () => {
         const send = (msg, level) => mainWindow?.webContents.send('log', { msg, level, ts: new Date().toLocaleTimeString() })
         send(`◆ Auto-Pulse: activating for ${presetName}…`, 'head')
         mainWindow?.webContents.send('game-watcher-event', { event: 'auto-pulse-start', gameId: detectedGame, presetId: detectedGame })
-        if (Notification.isSupported()) {
-          new Notification({
-            title: 'Pulse Activated',
-            body: `${presetName} detected — Pulse is now active`,
-            icon: path.join(__dirname, 'icon.png')
-          }).show()
-        }
         activatePulse(detectedGame, false, send).catch(() => { autoPulseTriggeredPreset = null })
       }
 
@@ -6414,13 +6424,6 @@ ipcMain.handle('start-game-watcher', async () => {
         send(`◆ Auto-Pulse: deactivating (${prev} closed)`, 'info')
         autoPulseTriggeredPreset = null
         mainWindow?.webContents.send('game-watcher-event', { event: 'auto-pulse-stop', gameId: prev })
-        if (Notification.isSupported() && prevPreset) {
-          new Notification({
-            title: 'Pulse Restored',
-            body: `${prevPreset.name} closed — system settings restored`,
-            icon: path.join(__dirname, 'icon.png')
-          }).show()
-        }
         deactivatePulse(send).catch(() => {})
       }
     }

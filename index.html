@@ -1412,6 +1412,18 @@ select.styled-select:focus { border-color: var(--pink); }
   </div>
 </div>
 
+<!-- AV Tip Banner -->
+<div id="av-tip-banner" style="display:none;position:fixed;bottom:0;left:0;right:0;z-index:9997;background:#1a1200;border-top:1px solid var(--warning);padding:10px 20px;animation:slideUp 0.3s ease">
+  <div style="display:flex;align-items:center;gap:12px;max-width:900px;margin:0 auto">
+    <span style="font-size:18px;color:var(--warning);flex-shrink:0">⚠</span>
+    <div style="flex:1;font-size:11px;color:var(--text)">
+      <strong style="color:var(--white)">Antivirus detected — add an exclusion for best performance.</strong>
+      <span style="color:var(--gray);margin-left:6px">Jylli Tool's hardware monitoring tools may be flagged or slowed by your AV. Add <code style="background:#ffffff18;padding:1px 4px;border-radius:3px">%LOCALAPPDATA%\Programs\Jylli Tool</code> to exclusions.</span>
+    </div>
+    <button class="btn btn-ghost btn-sm" onclick="dismissAvTip()" style="flex-shrink:0">Got it</button>
+  </div>
+</div>
+
 <!-- Debug Console -->
 <div id="debug-console">
   <div id="debug-console-bar">
@@ -2171,11 +2183,30 @@ async function init() {
     setTimeout(() => startOnboarding(), 800)
   }
 
+  // AV tip — shown once if a known aggressive AV is detected
+  if (!settings.avTipDismissed) {
+    api.detectAv?.().then(av => {
+      const known = ['norton', 'mcafee', 'bitdefender', 'avast', 'kaspersky', 'malwarebytes', 'f-secure', 'trend micro', 'webroot']
+      if (av && known.some(n => av.toLowerCase().includes(n))) {
+        document.getElementById('av-tip-banner').style.display = 'block'
+      }
+    }).catch(() => {})
+  }
+
   // Wire update events first, then check — so we never miss a fast response
   api.onUpdateAvailable?.((info) => {
     window._pendingUpdateVersion = info.version
     document.getElementById('update-banner-title').textContent = `Update v${info.version} available`
     document.getElementById('update-banner').style.display = 'block'
+    api.getWhatsNew?.().then(wn => {
+      const entry = (wn || []).find(e => e.version === info.version)
+      if (entry?.items?.length) {
+        const sub = document.getElementById('update-banner-sub')
+        const span = document.createElement('span')
+        span.textContent = `${entry.items.length} improvements`
+        sub.prepend(span)
+      }
+    }).catch(() => {})
   })
   api.onUpdateProgress?.((progress) => {
     const pct = Math.round(progress.percent || 0)
@@ -2618,6 +2649,16 @@ function buildSettings(c) {
           <span class="pill-slider"></span>
         </label>
       </div>
+      <div class="startup-row" style="justify-content:space-between">
+        <div>
+          <div class="startup-name">Discord Rich Presence</div>
+          <div class="startup-cmd">Show Jylli Tool activity in your Discord status</div>
+        </div>
+        <label class="toggle-pill">
+          <input type="checkbox" id="settings-rpc-check" onchange="settingsToggleDiscordRpc(this.checked)">
+          <span class="pill-slider"></span>
+        </label>
+      </div>
     </div>
 
     <!-- System -->
@@ -2654,7 +2695,7 @@ function buildSettings(c) {
           <div class="startup-cmd">Version <span id="settings-ver-label">…</span></div>
         </div>
         <div style="display:flex;gap:8px;flex-wrap:wrap">
-          <button class="btn btn-primary btn-sm" onclick="api.checkUpdate().then(r => { if(r && !r.available) toast('Already up to date','','ok') })">
+          <button class="btn btn-primary btn-sm" id="settings-check-update-btn" onclick="runUpdateCheck()">
             <i class="fa fa-rotate"></i> Check for Updates
           </button>
           <button class="btn btn-ghost btn-sm" onclick="api.openExternal('https://discord.gg/jylligraffat')">
@@ -2662,6 +2703,7 @@ function buildSettings(c) {
           </button>
         </div>
       </div>
+      <div id="settings-health-result" style="display:none;font-size:11px;padding:6px 18px 8px;"></div>
     </div>
 
   </div>`
@@ -2720,6 +2762,8 @@ function buildSettings(c) {
   if (gwCheck) gwCheck.checked = !!settings.gameWatcherEnabled
   const apCheck = document.getElementById('settings-ap-check')
   if (apCheck) apCheck.checked = !!settings.autoPulseEnabled
+  const rpcCheck = document.getElementById('settings-rpc-check')
+  if (rpcCheck) rpcCheck.checked = settings.discordRpcEnabled !== false
 
   // System toggles — set initial state
   const advCheck = document.getElementById('settings-adv-check')
@@ -2747,6 +2791,57 @@ function settingsToggleAnalytics(on) {
   settings.analyticsOptOut = !on
   api.saveSettings(settings)
   toast(on ? 'Usage stats enabled' : 'Usage stats disabled', '', on ? 'ok' : 'info')
+}
+
+function settingsToggleDiscordRpc(on) {
+  settings.discordRpcEnabled = on
+  api.saveSettings(settings)
+  api.setDiscordRpc(on)
+  toast(on ? 'Discord status enabled' : 'Discord status disabled', '', on ? 'ok' : 'info')
+}
+
+function dismissAvTip() {
+  document.getElementById('av-tip-banner').style.display = 'none'
+  settings.avTipDismissed = true
+  api.saveSettings(settings)
+}
+
+async function runUpdateCheck() {
+  const btn = document.getElementById('settings-check-update-btn')
+  btn.disabled = true
+  btn.innerHTML = '<i class="fa fa-rotate fa-spin"></i> Checking…'
+
+  const [updateResult, healthResult] = await Promise.all([
+    api.checkUpdate().catch(() => ({ ok: false })),
+    api.runTweakHealth().catch(() => null)
+  ])
+
+  btn.disabled = false
+  btn.innerHTML = '<i class="fa fa-rotate"></i> Check for Updates'
+
+  const healthEl = document.getElementById('settings-health-result')
+  if (healthResult && healthResult.checked > 0) {
+    if (healthResult.reverted.length === 0) {
+      healthEl.innerHTML = `<span style="color:var(--ok)">✓ All ${healthResult.checked} verified tweaks still active</span>`
+    } else {
+      const ids = JSON.stringify(healthResult.reverted)
+      healthEl.innerHTML = `<span style="color:var(--warning)">⚠ ${healthResult.reverted.length} tweak(s) reverted by Windows — <a href="#" style="color:var(--pink)" onclick="reapplyReverted(${ids.replace(/"/g,"'")}); return false">re-apply now</a></span>`
+    }
+    healthEl.style.display = 'block'
+  }
+
+  if (!updateResult?.available) {
+    toast('Already up to date', '', 'ok')
+  }
+}
+
+async function reapplyReverted(ids) {
+  for (const id of ids) {
+    await api.runTweak(id, 'apply').catch(() => {})
+  }
+  toast(`Re-applied ${ids.length} tweak(s)`, '', 'ok')
+  const healthEl = document.getElementById('settings-health-result')
+  if (healthEl) healthEl.innerHTML = `<span style="color:var(--ok)">✓ ${ids.length} tweak(s) re-applied</span>`
 }
 
 function shadeColor(hex, pct) {
