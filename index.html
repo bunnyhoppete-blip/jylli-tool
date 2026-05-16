@@ -7510,11 +7510,11 @@ function buildNetwork(c) {
       ]
     },
     {
-      title: 'NIC Offloads & Latency', rows: [
-        { id:'nic-offloads',       name:'Disable NIC hardware offloads (checksum, LSO, RSC)', desc:'Hardware offloads save CPU but add latency overhead. Disabling them gives more consistent network timing.', warning: wifiWarn },
-        { id:'nic-interrupt-mod',  name:'Disable NIC Interrupt Moderation', desc:'Interrupt moderation batches incoming packets to reduce CPU interrupts — but this increases latency. Disabling it gives more consistent ping under load. Real measurable gain for competitive play.', warning: wifiWarn },
-        { id:'nic-flow-control',   name:'Disable NIC Flow Control', desc:'Flow control pauses transmission when buffers fill, adding jitter. Disabling both Rx and Tx flow control gives smoother packet delivery.', warning: wifiWarn },
-        { id:'nic-energy-efficient', name:'Disable Energy Efficient Ethernet (EEE)', desc:'Your NIC throttles itself to save power during low traffic. During online gaming it spikes latency as it ramps back up. Disabling it keeps the NIC at full speed at all times.', warning: wifiWarn },
+      title: 'NIC Offloads & Latency', rows: si.isWifi ? [] : [
+        { id:'nic-offloads',       name:'Disable NIC hardware offloads (checksum, LSO, RSC)', desc:'Hardware offloads save CPU but add latency overhead. Disabling them gives more consistent network timing.' },
+        { id:'nic-interrupt-mod',  name:'Disable NIC Interrupt Moderation', desc:'Interrupt moderation batches incoming packets to reduce CPU interrupts — but this increases latency. Disabling it gives more consistent ping under load. Real measurable gain for competitive play.' },
+        { id:'nic-flow-control',   name:'Disable NIC Flow Control', desc:'Flow control pauses transmission when buffers fill, adding jitter. Disabling both Rx and Tx flow control gives smoother packet delivery.' },
+        { id:'nic-energy-efficient', name:'Disable Energy Efficient Ethernet (EEE)', desc:'Your NIC throttles itself to save power during low traffic. During online gaming it spikes latency as it ramps back up. Disabling it keeps the NIC at full speed at all times.' },
       ]
     },
     {
@@ -7527,6 +7527,7 @@ function buildNetwork(c) {
   ]
 
   sections.forEach(sec => {
+    if (!sec.rows.length) return
     const card = makeSection(sec.title)
     sec.rows.forEach(row => card.appendChild(makeRow(row)))
     c.appendChild(card)

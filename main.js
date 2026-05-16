@@ -5102,6 +5102,11 @@ ipcMain.handle('clean-power-plans', async () => {
 
 // What's New content
 const WHATS_NEW = [
+  { version: '1.4.1', date: 'May 2026', items: [
+    'Tweak Health Check — fixed: 5 tweaks (TDR Delay, NVMe Latency, Disable NetBIOS, Disable Background Apps, Disable HDCP) were always falsely reported as reverted by Windows even right after applying; health check now verifies the correct registry keys',
+    'Tweak Health Check — WPAD tweak removed from health check (it controls a Windows service, not a registry key, so cannot be verified this way)',
+    'Network tab — harmful NIC tweaks (offloads, interrupt moderation, flow control, Energy Efficient Ethernet) are now fully hidden for Wi-Fi users instead of just showing a warning; prevents accidental application on wireless adapters',
+  ]},
   { version: '1.4.0', date: 'May 2026', items: [
     'AMD & Intel Max Performance Power Plan — fixed and fully working: creates a custom plan tuned for your CPU with EPP=0, CPPC, full boost policy, and no idle/sleep',
     'Power Plan — "Clean up old power plans" button removes duplicate and third-party plans while keeping Balanced for revert',
@@ -5231,19 +5236,18 @@ const TWEAK_VERIFY = {
   'net-throttling':        { hive: 'HKLM', path: 'SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\Multimedia\\SystemProfile',      name: 'NetworkThrottlingIndex',   expect: 4294967295 },
   'power-throttling':      { hive: 'HKLM', path: 'SYSTEM\\CurrentControlSet\\Control\\Power\\PowerThrottling',                     name: 'PowerThrottlingOff',       expect: 1 },
   'priority-sep':          { hive: 'HKLM', path: 'SYSTEM\\CurrentControlSet\\Control',                                             name: 'Win32PrioritySeparation',  expect: 38 },
-  'tdr-delay':             { hive: 'HKLM', path: 'SYSTEM\\CurrentControlSet\\Control\\GraphicsDrivers',                            name: 'TdrDelay',                 expect: 8 },
+  'tdr-delay':             { hive: 'HKLM', path: 'SYSTEM\\CurrentControlSet\\Control\\GraphicsDrivers',                            name: 'TdrDelay',                 expect: 10 },
   'gpu-hwsch':             { hive: 'HKLM', path: 'SYSTEM\\CurrentControlSet\\Control\\GraphicsDrivers',                            name: 'HwSchMode',                expect: 2 },
-  'nvme-latency':          { hive: 'HKLM', path: 'SYSTEM\\CurrentControlSet\\Control\\StorPort',                                   name: 'TotalRequestHoldTime',     expect: 0 },
+  'nvme-latency':          { hive: 'HKLM', path: 'SYSTEM\\CurrentControlSet\\Control\\StorPort',                                   name: 'TelemetryPerformanceHighResolutionTimer', expect: 0 },
   'win-tips':              { hive: 'HKLM', path: 'SOFTWARE\\Policies\\Microsoft\\Windows\\CloudContent',                           name: 'DisableSoftLanding',       expect: 1 },
   'telemetry':             { hive: 'HKLM', path: 'SOFTWARE\\Policies\\Microsoft\\Windows\\DataCollection',                         name: 'AllowTelemetry',           expect: 0 },
   'disable-delivery-opt':  { hive: 'HKLM', path: 'SOFTWARE\\Policies\\Microsoft\\Windows\\DeliveryOptimization',                   name: 'DODownloadMode',           expect: 0 },
-  'disable-wpad':          { hive: 'HKCU', path: 'Software\\Microsoft\\Windows\\CurrentVersion\\Internet Settings\\Wpad',          name: 'WpadOverride',             expect: 1 },
-  'disable-netbios':       { hive: 'HKLM', path: 'SYSTEM\\CurrentControlSet\\Services\\NetBT\\Parameters',                        name: 'NodeType',                 expect: 2 },
+  'disable-netbios':       { hive: 'HKLM', path: 'SYSTEM\\CurrentControlSet\\Services\\NetBT\\Parameters',                        name: 'NetbiosOptions',           expect: 2 },
   'qos-reserve':           { hive: 'HKLM', path: 'SOFTWARE\\Policies\\Microsoft\\Windows\\Psched',                                 name: 'NonBestEffortLimit',       expect: 0 },
   'disable-mouse-accel':   { hive: 'HKCU', path: 'Control Panel\\Mouse',                                                          name: 'MouseSpeed',               expect: '0' },
-  'disable-background-apps':{ hive: 'HKLM', path: 'SOFTWARE\\Policies\\Microsoft\\Windows\\AppPrivacy',                            name: 'LetAppsRunInBackground',   expect: 2 },
+  'disable-background-apps':{ hive: 'HKCU', path: 'Software\\Microsoft\\Windows\\CurrentVersion\\BackgroundAccessApplications',    name: 'GlobalUserDisabled',       expect: 1 },
   'cortana':               { hive: 'HKLM', path: 'SOFTWARE\\Policies\\Microsoft\\Windows\\Windows Search',                         name: 'AllowCortana',             expect: 0 },
-  'disable-hdcp':          { hive: 'HKLM', path: 'SOFTWARE\\Policies\\Microsoft\\Windows\\HDCP',                                   name: 'HdcpPolicy',               expect: 0 },
+  'disable-hdcp':          { hive: 'HKLM', path: 'SYSTEM\\CurrentControlSet\\Control\\Class\\{4d36e968-e325-11ce-bfc1-08002be10318}\\0000', name: 'RMHdcpKeyglobZero', expect: 1 },
   'disable-auto-maintenance': { hive: 'HKLM', path: 'SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\Schedule\\Maintenance',      name: 'MaintenanceDisabled',      expect: 1 },
   'explorer-perf':         { hive: 'HKCU', path: 'Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\Advanced',               name: 'LaunchTo',                 expect: 1 },
 }
